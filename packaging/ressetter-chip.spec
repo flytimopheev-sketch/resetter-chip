@@ -26,7 +26,7 @@ Requires:       libusb1
 %setup -q
 
 %build
-cmake -B redhat-linux-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+cmake -B redhat-linux-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX=/usr
 cmake --build redhat-linux-build -j"$(nproc)"
 
 %check
