@@ -62,7 +62,7 @@ install(DIRECTORY src/profiles/
         DESTINATION ${CMAKE_INSTALL_DATADIR}/ressetter-chip/profiles
         FILES_MATCHING PATTERN "*.json")
 install(FILES README.md CHANGELOG.md LICENSE
-        DESTINATION ${CMAKE_INSTALL_DOCDIR})
+        DESTINATION share/doc/ressetter-chip)
 
 option(BUILD_TESTS "Сборка модульных тестов" OFF)
 if(BUILD_TESTS)

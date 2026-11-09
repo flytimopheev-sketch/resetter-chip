@@ -26,14 +26,14 @@ Requires:       libusb1
 %setup -q
 
 %build
-%cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
-%cmake_build
+cmake -B redhat-linux-build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+cmake --build redhat-linux-build -j"$(nproc)"
 
 %check
 ctest --test-dir redhat-linux-build --output-on-failure
 
 %install
-%cmake_install
+DESTDIR=%{buildroot} cmake --install redhat-linux-build
 mkdir -p %{buildroot}%{_licensedir}/%{name}
 install -pm 0644 LICENSE %{buildroot}%{_licensedir}/%{name}/LICENSE
 

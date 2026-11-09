@@ -52,13 +52,20 @@ jobs:
           VERSION="${TAG#v}"
           echo "Версия релиза: ${VERSION}"
           sed -i "s/^Version:.*/Version:        ${VERSION}/" packaging/ressetter-chip.spec
-          mkdir -p "/opt/pkg/ressetter-chip-${VERSION}" /root/rpmbuild/SOURCES dist
-          cp -r src tests packaging CMakeLists.txt README.md CHANGELOG.md LICENSE \
-                "/opt/pkg/ressetter-chip-${VERSION}/"
-          tar czf "/root/rpmbuild/SOURCES/ressetter-chip-${VERSION}.tar.gz" \
-                -C /opt/pkg "ressetter-chip-${VERSION}"
-          rpmbuild -ba packaging/ressetter-chip.spec
-          cp /root/rpmbuild/RPMS/*/*.rpm dist/
+
+          TOPDIR="${{ github.workspace }}/rpmbuild"
+          mkdir -p "${TOPDIR}/SOURCES" "${TOPDIR}/SPECS" "${TOPDIR}/BUILD" "${TOPDIR}/RPMS" "${TOPDIR}/SRPMS" dist
+          SRCROOT="/tmp/ressetter-chip-${VERSION}"
+          rm -rf "${SRCROOT}"
+          mkdir -p "${SRCROOT}"
+          cp -r src tests packaging CMakeLists.txt README.md CHANGELOG.md LICENSE "${SRCROOT}/"
+          tar czf "${TOPDIR}/SOURCES/ressetter-chip-${VERSION}.tar.gz" \
+                -C /tmp "ressetter-chip-${VERSION}"
+          rm -rf "${SRCROOT}"
+
+          rpmbuild --define "_topdir ${TOPDIR}" -ba packaging/ressetter-chip.spec
+          shopt -s globstar nullglob
+          cp "${TOPDIR}/RPMS"/**/*.rpm dist/
           ls -l dist
 
       - name: Публикация релиза и вложение RPM
