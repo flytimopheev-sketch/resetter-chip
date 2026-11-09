@@ -1,0 +1,12 @@
+build/
+output/
+*.rpm
+*.tar.gz
+.git/
+.idea/
+.vscode/
+*.o
+*.moc
+Makefile
+cmake-install.cmake
+CMakeCache.txt

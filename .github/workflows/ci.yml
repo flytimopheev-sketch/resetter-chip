@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Сборка и тесты (Fedora 40)
+    runs-on: ubuntu-latest
+    container: fedora:40
+    steps:
+      - name: Установка git
+        run: dnf -y install git && dnf clean all
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Доверие рабочему каталогу git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Зависимости сборки
+        run: >
+          dnf -y install
+          cmake gcc-c++ make pkgconf-pkg-config
+          qt6-qtbase-devel libusb1-devel
+          && dnf clean all
+
+      - name: Конфигурация CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
+
+      - name: Сборка
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Тесты
+        run: ctest --test-dir build --output-on-failure
+
+  rpm:
+    name: RPM-пакет (Fedora 40)
+    runs-on: ubuntu-latest
+    container: fedora:40
+    steps:
+      - name: Установка git
+        run: dnf -y install git && dnf clean all
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Доверие рабочему каталогу git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Зависимости упаковки
+        run: >
+          dnf -y install
+          cmake gcc-c++ make pkgconf-pkg-config
+          qt6-qtbase-devel libusb1-devel
+          rpm-build redhat-rpm-config tar gzip
+          && dnf clean all
+
+      - name: Сборка RPM
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/^project(ressetter-chip VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
+          echo "Версия: ${VERSION}"
+          mkdir -p "/opt/pkg/ressetter-chip-${VERSION}" /root/rpmbuild/SOURCES dist
+          cp -r src tests packaging CMakeLists.txt README.md CHANGELOG.md LICENSE \
+                "/opt/pkg/ressetter-chip-${VERSION}/"
+          tar czf "/root/rpmbuild/SOURCES/ressetter-chip-${VERSION}.tar.gz" \
+                -C /opt/pkg "ressetter-chip-${VERSION}"
+          rpmbuild -ba packaging/ressetter-chip.spec
+          cp /root/rpmbuild/RPMS/*/*.rpm dist/
+
+      - name: Загрузка RPM как артефакта
+        uses: actions/upload-artifact@v4
+        with:
+          name: ressetter-chip-rpm
+          path: dist/*.rpm
+          if-no-files-found: error
+          retention-days: 14
