@@ -80,7 +80,7 @@ jobs:
           cp /root/rpmbuild/RPMS/*/*.rpm dist/
 
       - name: Загрузка RPM как артефакта
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ressetter-chip-rpm
           path: dist/*.rpm
