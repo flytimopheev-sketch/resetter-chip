@@ -1,0 +1,92 @@
+name: Сообщение об ошибке
+description: Сообщить о некорректной работе Ressetter Chip
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за отчёт! Чем точнее шаги воспроизведения и лог, тем быстрее
+        удастся разобраться. Перед отправкой проверьте, что такой issue ещё не создан.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Перед отправкой
+      options:
+        - label: Я проверил(а) существующие issues и не нашёл(ла) дубликат
+          required: true
+        - label: В отчёте нет конфиденциальных данных и дампов с личными данными
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия Ressetter Chip
+      description: Вывод команды `ressetter-chip --version` или версия из RPM
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: ОС и версия Qt
+      placeholder: "RED OS 7.3, Qt 6.6.2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: adapter
+    attributes:
+      label: Программатор
+      options:
+        - CH341A (I2C)
+        - Другой / не подключается
+    validations:
+      required: true
+
+  - type: input
+    id: chip
+    attributes:
+      label: Чип и картридж
+      placeholder: "24C16, HP CE255A"
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      placeholder: |
+        1. Подключить программатор
+        2. Выбрать профиль 24C16
+        3. Нажать «Читать чип»
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Фактическое поведение
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Лог и сообщения об ошибках
+      description: |
+        Фрагмент `~/.local/share/RessetterChip/Ressetter Chip/logs/ressetter-chip.log`
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Дополнительный контекст
+      description: Фотографии подключения, особенности оборудования и т. п.

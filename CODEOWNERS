@@ -1,0 +1,10 @@
+# Ответственные за ревью
+* @flytimopheev-sketch
+
+# Ядро и протокол
+/src/core/       @flytimopheev-sketch
+/src/adapters/   @flytimopheev-sketch
+
+# Упаковка и CI
+/packaging/      @flytimopheev-sketch
+/.github/        @flytimopheev-sketch
