@@ -3,7 +3,7 @@
 ## Обзор
 
 Приложение разделено на независимое ядро и графический интерфейс.
-Ядро (`ressetter_core`) собирается как статическая библиотека и не зависит
+Ядро (`Resetter_core`) собирается как статическая библиотека и не зависит
 от QtWidgets, поэтому его можно использовать в тестах и консольных утилитах.
 
 ```
@@ -38,11 +38,11 @@
 `ProfileManager` — синглтон, загружающий `*.json` из каталога профилей.
 Каталог ищется в порядке:
 
-1. переменная окружения `RESSETTER_CHIP_PROFILES`;
+1. переменная окружения `Resetter_CHIP_PROFILES`;
 2. `./profiles` рядом с исполняемым файлом;
-3. `../share/ressetter-chip/profiles` (установка из `build/`);
+3. `../share/Resetter-chip/profiles` (установка из `build/`);
 4. исходники (`../src/profiles`, `../../src/profiles`);
-5. `/usr/share/ressetter-chip/profiles`, `/usr/local/share/...`.
+5. `/usr/share/Resetter-chip/profiles`, `/usr/local/share/...`.
 
 Один файл может содержать как массив профилей, так и одиночный объект.
 Профили с пустым `id` или нулевым `size_bytes` игнорируются.

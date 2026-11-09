@@ -1,8 +1,8 @@
 # Профили чипов и картриджей
 
 Профили — JSON-файлы в `src/profiles/`. После установки они лежат в
-`/usr/share/ressetter-chip/profiles`, каталог можно переопределить переменной
-окружения `RESSETTER_CHIP_PROFILES`.
+`/usr/share/Resetter-chip/profiles`, каталог можно переопределить переменной
+окружения `Resetter_CHIP_PROFILES`.
 
 ## Формат профиля чипа
 
@@ -71,7 +71,7 @@
 4. Добавьте запись в JSON и проверьте загрузку профиля:
 
    ```bash
-   RESSETTER_CHIP_PROFILES=./src/profiles ./build/ressetter-chip
+   Resetter_CHIP_PROFILES=./src/profiles ./build/Resetter-chip
    ```
 
 5. Прогоните тесты: `ctest --test-dir build --output-on-failure`.

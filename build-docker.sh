@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Сборка образа, тестов и RPM-пакета Ressetter Chip
+# Сборка образа, тестов и RPM-пакета Resetter Chip
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE_NAME="ressetter-chip-builder"
+IMAGE_NAME="Resetter-chip-builder"
 OUTPUT_DIR="${SCRIPT_DIR}/output"
 
 mkdir -p "${OUTPUT_DIR}"

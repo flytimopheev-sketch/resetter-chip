@@ -1,12 +1,12 @@
 [Desktop Entry]
-Name=Ressetter Chip
-Name[ru]=Ressetter Chip — сброс счётчиков картриджей
+Name=Resetter Chip
+Name[ru]=Resetter Chip — сброс счётчиков картриджей
 GenericName=EEPROM cartridge chip programmer
 GenericName[ru]=Программатор чипов картриджей
 Comment=Read, reset the page counter and write EEPROM dumps of laser printer and MFP cartridges
 Comment[ru]=Чтение, сброс счётчика и запись дампов чипов картриджей лазерных принтеров и МФУ
-Exec=ressetter-chip
-Icon=ressetter-chip
+Exec=Resetter-chip
+Icon=Resetter-chip
 Terminal=false
 Type=Application
 Categories=Utility;HardwareSettings;Electronics;

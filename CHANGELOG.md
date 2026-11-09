@@ -23,7 +23,7 @@
 - Контейнер дампа `RSCHIPD1` с метаданными, CRC32 и поддержкой «сырых» `.bin`.
 - Сканирование шины I2C и выбор адреса устройства `0x50–0x57`.
 - JSON-профили чипов и картриджей, переопределение каталога через
-  `RESSETTER_CHIP_PROFILES`.
+  `Resetter_CHIP_PROFILES`.
 - Модульные тесты на Qt Test: контрольные суммы, дампы, профили, валидация,
   HEX-редактор.
 - Упаковка RPM для Fedora и RED OS, udev-правило для доступа без `root`,
@@ -35,5 +35,5 @@
 - Отмена длительных операций и таймауты обмена с программатором.
 - Санитайзинг аргументов и отказ от небезопасных конструкций при работе с файлами.
 
-[Unreleased]: https://github.com/flytimopheev-sketch/ressetter-chip/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/flytimopheev-sketch/ressetter-chip/releases/tag/v1.0.0
+[Unreleased]: https://github.com/flytimopheev-sketch/Resetter-chip/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/flytimopheev-sketch/Resetter-chip/releases/tag/v1.0.0

@@ -51,19 +51,19 @@ jobs:
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           VERSION="${TAG#v}"
           echo "Версия релиза: ${VERSION}"
-          sed -i "s/^Version:.*/Version:        ${VERSION}/" packaging/ressetter-chip.spec
+          sed -i "s/^Version:.*/Version:        ${VERSION}/" packaging/Resetter-chip.spec
 
           TOPDIR="${{ github.workspace }}/rpmbuild"
           mkdir -p "${TOPDIR}/SOURCES" "${TOPDIR}/SPECS" "${TOPDIR}/BUILD" "${TOPDIR}/RPMS" "${TOPDIR}/SRPMS" dist
-          SRCROOT="/tmp/ressetter-chip-${VERSION}"
+          SRCROOT="/tmp/Resetter-chip-${VERSION}"
           rm -rf "${SRCROOT}"
           mkdir -p "${SRCROOT}"
           cp -r src tests packaging CMakeLists.txt README.md CHANGELOG.md LICENSE "${SRCROOT}/"
-          tar czf "${TOPDIR}/SOURCES/ressetter-chip-${VERSION}.tar.gz" \
-                -C /tmp "ressetter-chip-${VERSION}"
+          tar czf "${TOPDIR}/SOURCES/Resetter-chip-${VERSION}.tar.gz" \
+                -C /tmp "Resetter-chip-${VERSION}"
           rm -rf "${SRCROOT}"
 
-          rpmbuild --define "_topdir ${TOPDIR}" -ba packaging/ressetter-chip.spec
+          rpmbuild --define "_topdir ${TOPDIR}" -ba packaging/Resetter-chip.spec
           shopt -s globstar nullglob
           cp "${TOPDIR}/RPMS"/**/*.rpm dist/
           ls -l dist
@@ -76,7 +76,7 @@ jobs:
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" \
-              --title "Ressetter Chip ${TAG}" \
+              --title "Resetter Chip ${TAG}" \
               --notes "См. [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)."
           fi
           gh release upload "$TAG" dist/*.rpm --clobber

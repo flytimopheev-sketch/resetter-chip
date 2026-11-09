@@ -69,20 +69,20 @@ jobs:
       - name: Сборка RPM
         run: |
           set -euo pipefail
-          VERSION="$(sed -n 's/^project(ressetter-chip VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
+          VERSION="$(sed -n 's/^project(Resetter-chip VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
           echo "Версия: ${VERSION}"
-          mkdir -p "/opt/pkg/ressetter-chip-${VERSION}" /root/rpmbuild/SOURCES dist
+          mkdir -p "/opt/pkg/Resetter-chip-${VERSION}" /root/rpmbuild/SOURCES dist
           cp -r src tests packaging CMakeLists.txt README.md CHANGELOG.md LICENSE \
-                "/opt/pkg/ressetter-chip-${VERSION}/"
-          tar czf "/root/rpmbuild/SOURCES/ressetter-chip-${VERSION}.tar.gz" \
-                -C /opt/pkg "ressetter-chip-${VERSION}"
-          rpmbuild -ba packaging/ressetter-chip.spec
+                "/opt/pkg/Resetter-chip-${VERSION}/"
+          tar czf "/root/rpmbuild/SOURCES/Resetter-chip-${VERSION}.tar.gz" \
+                -C /opt/pkg "Resetter-chip-${VERSION}"
+          rpmbuild -ba packaging/Resetter-chip.spec
           cp /root/rpmbuild/RPMS/*/*.rpm dist/
 
       - name: Загрузка RPM как артефакта
         uses: actions/upload-artifact@v4
         with:
-          name: ressetter-chip-rpm
+          name: Resetter-chip-rpm
           path: dist/*.rpm
           if-no-files-found: error
           retention-days: 14

@@ -93,7 +93,7 @@ bool ProfileManager::loadProfiles(const QString &directoryPath)
 QString ProfileManager::defaultProfilesDirectory()
 {
     // 1) Явное переопределение через переменную окружения
-    const QByteArray envPath = qgetenv("RESSETTER_CHIP_PROFILES");
+    const QByteArray envPath = qgetenv("Resetter_CHIP_PROFILES");
     if (!envPath.isEmpty()) {
         const QString path = QString::fromLocal8Bit(envPath);
         if (QDir(path).exists()) {
@@ -106,14 +106,14 @@ QString ProfileManager::defaultProfilesDirectory()
     // 2) Каталог рядом с исполняемым файлом (для сборки и для установки)
     const QString appDir = QCoreApplication::applicationDirPath();
     candidates << appDir + QStringLiteral("/profiles")
-               << appDir + QStringLiteral("/../share/ressetter-chip/profiles")
+               << appDir + QStringLiteral("/../share/Resetter-chip/profiles")
                << appDir + QStringLiteral("/../src/profiles")
                << appDir + QStringLiteral("/../../src/profiles");
 
     // 3) Системные пути установки
 #ifdef Q_OS_UNIX
-    candidates << QStringLiteral("/usr/share/ressetter-chip/profiles")
-               << QStringLiteral("/usr/local/share/ressetter-chip/profiles");
+    candidates << QStringLiteral("/usr/share/Resetter-chip/profiles")
+               << QStringLiteral("/usr/local/share/Resetter-chip/profiles");
 #endif
 
     for (const QString &candidate : candidates) {

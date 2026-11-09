@@ -1,23 +1,23 @@
 <div align="center">
 
-<img src="packaging/ressetter-chip.svg" width="104" height="104" alt="Ressetter Chip">
+<img src="packaging/Resetter-chip.svg" width="104" height="104" alt="Resetter Chip">
 
-# Ressetter Chip
+# Resetter Chip
 
 **Сброс счётчиков чипов картриджей лазерных принтеров и МФУ через программатор CH341A (I2C)**
 
-[![CI](https://github.com/flytimopheev-sketch/ressetter-chip/actions/workflows/ci.yml/badge.svg)](https://github.com/flytimopheev-sketch/ressetter-chip/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/flytimopheev-sketch/ressetter-chip?sort=semver&style=flat-square&color=2f855a)](https://github.com/flytimopheev-sketch/ressetter-chip/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/flytimopheev-sketch/ressetter-chip/total?style=flat-square)](https://github.com/flytimopheev-sketch/ressetter-chip/releases)
-[![License](https://img.shields.io/github/license/flytimopheev-sketch/ressetter-chip?style=flat-square&color=2f855a)](LICENSE)
+[![CI](https://github.com/flytimopheev-sketch/Resetter-chip/actions/workflows/ci.yml/badge.svg)](https://github.com/flytimopheev-sketch/Resetter-chip/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/flytimopheev-sketch/Resetter-chip?sort=semver&style=flat-square&color=2f855a)](https://github.com/flytimopheev-sketch/Resetter-chip/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/flytimopheev-sketch/Resetter-chip/total?style=flat-square)](https://github.com/flytimopheev-sketch/Resetter-chip/releases)
+[![License](https://img.shields.io/github/license/flytimopheev-sketch/Resetter-chip?style=flat-square&color=2f855a)](LICENSE)
 [![Qt](https://img.shields.io/badge/Qt-6-41cd52?style=flat-square&logo=qt&logoColor=white)](https://www.qt.io/)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%C2%B7%20RPM-0b7285?style=flat-square)](https://github.com/flytimopheev-sketch/ressetter-chip/releases)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%C2%B7%20RPM-0b7285?style=flat-square)](https://github.com/flytimopheev-sketch/Resetter-chip/releases)
 
 [Возможности](#-возможности) · [Установка](#-установка) · [Использование](#-использование) · [Профили](#-профили-чипов) · [Сборка](#-сборка-из-исходников) · [Документация](docs/) · [Участие](CONTRIBUTING.md)
 
 </div>
 
-![Интерфейс Ressetter Chip](docs/screenshot.png)
+![Интерфейс Resetter Chip](docs/screenshot.png)
 
 <p align="center"><sub>Макет интерфейса, повторяющий компоновку окна приложения (<a href="packaging/app_mockup.html">packaging/app_mockup.html</a>).</sub></p>
 
@@ -25,7 +25,7 @@
 
 ## 📖 О проекте
 
-**Ressetter Chip** — графическое приложение на C++17 и Qt 6 для обслуживания
+**Resetter Chip** — графическое приложение на C++17 и Qt 6 для обслуживания
 чипов EEPROM, которые устанавливаются в картриджи лазерных принтеров и МФУ.
 Приложение работает с популярным USB-программатором **CH341A** в режиме I2C:
 читает дамп, обнуляет счётчик страниц по профилю картриджа, записывает
@@ -72,11 +72,11 @@
 
 ### Готовый RPM-пакет
 
-Скачайте пакет из [последнего релиза](https://github.com/flytimopheev-sketch/ressetter-chip/releases/latest)
+Скачайте пакет из [последнего релиза](https://github.com/flytimopheev-sketch/Resetter-chip/releases/latest)
 и установите его:
 
 ```bash
-sudo dnf install ./ressetter-chip-1.0.0-1.*.x86_64.rpm
+sudo dnf install ./Resetter-chip-1.0.0-1.*.x86_64.rpm
 ```
 
 Для доступа к программатору без `root` установите udev-правило (оно входит в пакет):
@@ -93,8 +93,8 @@ sudo udevadm control --reload-rules && sudo udevadm trigger
 
 ```bash
 sudo dnf install cmake gcc-c++ qt6-qtbase-devel libusb1-devel pkgconf-pkg-config
-git clone https://github.com/flytimopheev-sketch/ressetter-chip.git
-cd ressetter-chip
+git clone https://github.com/flytimopheev-sketch/Resetter-chip.git
+cd Resetter-chip
 cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON
 cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
@@ -117,8 +117,8 @@ sudo cmake --install build
 ## 🧩 Профили чипов
 
 Профили лежат в `src/profiles/*.json` и устанавливаются в
-`/usr/share/ressetter-chip/profiles`. Каталог можно переопределить переменной
-окружения `RESSETTER_CHIP_PROFILES`.
+`/usr/share/Resetter-chip/profiles`. Каталог можно переопределить переменной
+окружения `Resetter_CHIP_PROFILES`.
 
 Формат — массив профилей:
 
@@ -162,7 +162,7 @@ src/
 └── utils/              — логгер, файловые утилиты, коды ошибок
 ```
 
-Логика собрана в статическую библиотеку `ressetter_core` и не зависит от GUI —
+Логика собрана в статическую библиотеку `Resetter_core` и не зависит от GUI —
 её можно тестировать отдельно от интерфейса. Подробнее:
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -185,8 +185,8 @@ ctest --test-dir build --output-on-failure
 Либо вручную:
 
 ```bash
-docker build -t ressetter-chip-builder .
-docker run --rm -v "$(pwd)/output:/output" ressetter-chip-builder
+docker build -t Resetter-chip-builder .
+docker run --rm -v "$(pwd)/output:/output" Resetter-chip-builder
 ```
 
 Внутри образа последовательно выполняются сборка, `ctest` и `rpmbuild -ba`.
@@ -215,8 +215,8 @@ docker run --rm -v "$(pwd)/output:/output" ressetter-chip-builder
 прочитайте [CONTRIBUTING.md](CONTRIBUTING.md) и [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ```bash
-git clone https://github.com/flytimopheev-sketch/ressetter-chip.git
-cd ressetter-chip
+git clone https://github.com/flytimopheev-sketch/Resetter-chip.git
+cd Resetter-chip
 cmake -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON
 cmake --build build -j"$(nproc)" && ctest --test-dir build --output-on-failure
 ```

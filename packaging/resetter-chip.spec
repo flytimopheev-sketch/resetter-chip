@@ -1,10 +1,10 @@
-Name:           ressetter-chip
+Name:           Resetter-chip
 Version:        1.0.0
 Release:        1%{?dist}
 Summary:        Сброс счётчиков чипов картриджей (CH341A, I2C)
 
 License:        MIT
-URL:            https://github.com/flytimopheev-sketch/ressetter-chip
+URL:            https://github.com/flytimopheev-sketch/Resetter-chip
 Source0:        %{name}-%{version}.tar.gz
 
 BuildRequires:  qt6-qtbase-devel >= 6.2
@@ -38,17 +38,17 @@ mkdir -p %{buildroot}%{_licensedir}/%{name}
 install -pm 0644 LICENSE %{buildroot}%{_licensedir}/%{name}/LICENSE
 
 %files
-%{_bindir}/ressetter-chip
-%{_datadir}/applications/ressetter-chip.desktop
-%{_datadir}/icons/hicolor/scalable/apps/ressetter-chip.svg
-%{_datadir}/ressetter-chip/profiles
-%doc %{_datadir}/doc/ressetter-chip/README.md
-%doc %{_datadir}/doc/ressetter-chip/CHANGELOG.md
+%{_bindir}/Resetter-chip
+%{_datadir}/applications/Resetter-chip.desktop
+%{_datadir}/icons/hicolor/scalable/apps/Resetter-chip.svg
+%{_datadir}/Resetter-chip/profiles
+%doc %{_datadir}/doc/Resetter-chip/README.md
+%doc %{_datadir}/doc/Resetter-chip/CHANGELOG.md
 %license %{_licensedir}/%{name}/LICENSE
 /usr/lib/udev/rules.d/99-ch341a.rules
 
 %changelog
-* Sun Nov 09 2026 Ressetter Chip contributors <flytimopheev-sketch@users.noreply.github.com> - 1.0.0-1
+* Sun Nov 09 2026 Resetter Chip contributors <flytimopheev-sketch@users.noreply.github.com> - 1.0.0-1
 - Первый публичный выпуск: чтение, сброс счётчика, запись и верификация EEPROM 24Cxx
 
 

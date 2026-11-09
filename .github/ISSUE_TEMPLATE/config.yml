@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
   - name: Политика безопасности
-    url: https://github.com/flytimopheev-sketch/ressetter-chip/security/policy
+    url: https://github.com/flytimopheev-sketch/Resetter-chip/security/policy
     about: Об уязвимостях сообщайте приватно, а не через публичные issues
   - name: Документация
-    url: https://github.com/flytimopheev-sketch/ressetter-chip/tree/main/docs
+    url: https://github.com/flytimopheev-sketch/Resetter-chip/tree/main/docs
     about: Архитектура, протокол CH341A и формат профилей
   - name: Обсуждения
-    url: https://github.com/flytimopheev-sketch/ressetter-chip/discussions
+    url: https://github.com/flytimopheev-sketch/Resetter-chip/discussions
     about: Вопросы, идеи и обмен опытом

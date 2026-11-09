@@ -1,6 +1,6 @@
 # Участие в разработке
 
-Спасибо за интерес к **Ressetter Chip**! Ниже — как предложить изменение,
+Спасибо за интерес к **Resetter Chip**! Ниже — как предложить изменение,
 сообщить об ошибке и что ожидается от pull request.
 
 ## Сообщения об ошибках и идеи
@@ -10,7 +10,7 @@
   [feature request](.github/ISSUE_TEMPLATE/feature_request.yml).
 - Для ошибок приложите версию ОС, версию Qt, модель программатора и чипа,
   шаги воспроизведения и фрагмент лога
-  (`~/.local/share/RessetterChip/Ressetter Chip/logs/ressetter-chip.log`).
+  (`~/.local/share/ResetterChip/Resetter Chip/logs/Resetter-chip.log`).
 - **Не прикладывайте дампы картриджей с персональными или служебными данными**,
   заменяйте значения на условные.
 

@@ -23,7 +23,7 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    setWindowTitle(QStringLiteral("Ressetter Chip — сброс счётчиков чипов картриджей"));
+    setWindowTitle(QStringLiteral("Resetter Chip — сброс счётчиков чипов картриджей"));
     setMinimumSize(1100, 720);
 
     setupUi();
@@ -175,7 +175,7 @@ void MainWindow::loadProfiles()
 
 void MainWindow::updateTitle()
 {
-    QString title = QStringLiteral("Ressetter Chip");
+    QString title = QStringLiteral("Resetter Chip");
     if (!m_profileId.isEmpty()) {
         title += QStringLiteral(" — %1").arg(m_profileId);
     }

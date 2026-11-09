@@ -1,5 +1,5 @@
 name: Сообщение об ошибке
-description: Сообщить о некорректной работе Ressetter Chip
+description: Сообщить о некорректной работе Resetter Chip
 title: "[bug]: "
 labels: ["bug"]
 body:
@@ -22,8 +22,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Версия Ressetter Chip
-      description: Вывод команды `ressetter-chip --version` или версия из RPM
+      label: Версия Resetter Chip
+      description: Вывод команды `Resetter-chip --version` или версия из RPM
       placeholder: "1.0.0"
     validations:
       required: true
@@ -82,7 +82,7 @@ body:
     attributes:
       label: Лог и сообщения об ошибках
       description: |
-        Фрагмент `~/.local/share/RessetterChip/Ressetter Chip/logs/ressetter-chip.log`
+        Фрагмент `~/.local/share/ResetterChip/Resetter Chip/logs/Resetter-chip.log`
       render: shell
 
   - type: textarea
