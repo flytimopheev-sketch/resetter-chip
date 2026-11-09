@@ -29,10 +29,10 @@ compile_commands.json
 *.swp
 *~
 
-# Среда выполнения
+# Среда выполнения (core-дампы — только в корне репозитория)
 *.log
-core
-core.*
+/core
+/core.*
 
 # ОС
 .DS_Store
