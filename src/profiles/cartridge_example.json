@@ -1,0 +1,37 @@
+[
+  {
+    "id": "HP_CC364A",
+    "name": "HP CC364A / CE255A (LaserJet P2015, P2055)",
+    "chip_profile": "24C16",
+    "printer_models": ["HP LaserJet P2015", "HP LaserJet P2055"],
+    "cartridge_models": ["HP CC364A", "HP CE255A"],
+    "counter_offset": 255,
+    "counter_size": 2,
+    "counter_initial_value": 0,
+    "page_resource": 3500,
+    "protected_ranges": [
+      { "start": 0, "end": 16, "description": "Идентификатор производителя и модель" },
+      { "start": 4080, "end": 4096, "description": "Контрольные суммы и регион" }
+    ],
+    "allowed_modify_ranges": [
+      { "start": 16, "end": 4080, "description": "Счётчик страниц и пользовательские данные" }
+    ]
+  },
+  {
+    "id": "Samsung_MLT_D101S",
+    "name": "Samsung MLT-D101S (ML-2160, ML-2165)",
+    "chip_profile": "24C08",
+    "printer_models": ["Samsung ML-2160", "Samsung ML-2165"],
+    "cartridge_models": ["MLT-D101S", "MLT-D101L"],
+    "counter_offset": 1023,
+    "counter_size": 2,
+    "counter_initial_value": 0,
+    "page_resource": 3000,
+    "protected_ranges": [
+      { "start": 0, "end": 32, "description": "Серийный номер и регион" }
+    ],
+    "allowed_modify_ranges": [
+      { "start": 32, "end": 1024, "description": "Счётчик и ресурс" }
+    ]
+  }
+]

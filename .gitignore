@@ -1,0 +1,40 @@
+# Артефакты сборки
+build/
+build-*/
+cmake-build-*/
+_install/
+output/
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.exe
+*.moc
+moc_*.cpp
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+
+# Пакеты
+*.rpm
+*.deb
+*.tar.gz
+*.zip
+
+# IDE и редакторы
+.vscode/
+.idea/
+*.user
+*.swp
+*~
+
+# Среда выполнения
+*.log
+core
+core.*
+
+# ОС
+.DS_Store
+Thumbs.db
+desktop.ini
