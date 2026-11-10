@@ -17,6 +17,8 @@ struct DumpInfo {
     QString chipId;
     QString cartridgeModel;
     bool hasMetadata = false;  // был ли заголовок с метаданными
+    bool crcValid = false;     // проверена ли контрольная сумма контейнера
+    QString error;             // причина, если контейнер повреждён
 };
 
 // Менеджер дампов: сохранение, загрузка, сравнение, резервные копии.
@@ -29,6 +31,9 @@ public:
                          const QString &chipId = QString(),
                          const QString &cartridgeModel = QString());
 
+    // Сохранить без заголовка — для совместимости с ponyprog и другими tools
+    static bool saveRawDump(const QString &filePath, const QByteArray &data);
+
     static std::optional<QByteArray> loadDump(const QString &filePath);
     static std::optional<DumpInfo> dumpInfo(const QString &filePath);
 
@@ -37,6 +42,9 @@ public:
 
     static QString backupDirectory();
     static QString backupFileName(const QString &prefix = QStringLiteral("cartridge_backup"));
+
+private:
+    static constexpr qint64 kMaxDumpSize = 16 * 1024 * 1024;
 };
 
 #endif // DUMP_MANAGER_H

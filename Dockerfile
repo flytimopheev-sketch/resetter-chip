@@ -19,8 +19,8 @@ RUN dnf -y install \
         redhat-rpm-config \
     && dnf clean all
 
-WORKDIR /opt/Resetter-chip
-COPY . /opt/Resetter-chip/
+WORKDIR /opt/resetter-chip
+COPY . /opt/resetter-chip/
 
 # 1. Сборка приложения
 RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON \
@@ -29,17 +29,17 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON \
 # 2. Модульные тесты
 RUN ctest --test-dir build --output-on-failure
 
-# 3. Подготовка исходников для rpmbuild
-RUN mkdir -p /opt/pkg/Resetter-chip-1.0.0 /root/rpmbuild/SOURCES \
+# 3. Подготовка исходников для rpmbuild (имя каталога/архива — как в Source0)
+RUN VERSION="$(sed -n 's/^project([^ ]* VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)" \
+    && sed -i "s/^Version:.*/Version:        ${VERSION}/" packaging/resetter-chip.spec \
+    && mkdir -p "/opt/pkg/resetter-chip-${VERSION}" /root/rpmbuild/SOURCES \
     && cp -r src tests packaging CMakeLists.txt README.md CHANGELOG.md LICENSE \
-             /opt/pkg/Resetter-chip-1.0.0/ \
-    && tar czf /root/rpmbuild/SOURCES/Resetter-chip-1.0.0.tar.gz \
-           -C /opt/pkg Resetter-chip-1.0.0
+             "/opt/pkg/resetter-chip-${VERSION}/" \
+    && tar czf "/root/rpmbuild/SOURCES/resetter-chip-${VERSION}.tar.gz" \
+           -C /opt/pkg "resetter-chip-${VERSION}"
 
 # 4. Сборка RPM (внутри также прогоняются тесты через %check)
-RUN rpmbuild -ba packaging/Resetter-chip.spec
+RUN rpmbuild -ba packaging/resetter-chip.spec
 
 VOLUME ["/output"]
 CMD ["bash", "-c", "cp -v /root/rpmbuild/RPMS/*/*.rpm /output/ 2>/dev/null || true; ls -l /output"]
-
-

@@ -84,7 +84,29 @@ private slots:
         const auto chip = pm.profile(QStringLiteral("24C16"));
         QCOMPARE(chip->sizeBytes, static_cast<quint32>(2048));
         QCOMPARE(chip->pageSize, static_cast<quint16>(16));
+        QCOMPARE(chip->counterOffset, static_cast<quint32>(0xFFFFFFFFu));
         QCOMPARE(chip->protectedRanges.size(), 2);
+        QCOMPARE(chip->protectedRanges.at(1).first, static_cast<quint32>(2032));
+        QCOMPARE(chip->protectedRanges.at(1).second, static_cast<quint32>(2048));
+
+        const auto large = pm.profile(QStringLiteral("24C1024"));
+        QVERIFY(large != nullptr);
+        QCOMPARE(large->twoByteAddress, true);
+        QCOMPARE(large->blockBits, static_cast<quint8>(1));
+
+        QCOMPARE(pm.cartridgeCount(), 2);
+        const auto resolved = pm.resolveProfile(QStringLiteral("HP_CC364A"));
+        QVERIFY2(resolved != nullptr, "Профиль картриджа HP должен разрешаться в 24C16");
+        QCOMPARE(resolved->sizeBytes, static_cast<quint32>(2048));
+        QCOMPARE(resolved->counterOffset, static_cast<quint32>(255));
+        QCOMPARE(resolved->counterSize, static_cast<quint32>(2));
+        QCOMPARE(resolved->allowedRanges.size(), 1);
+
+        // Счётчик не должен выходить за границу 1024-байтного 24C08.
+        const auto samsung = pm.resolveProfile(QStringLiteral("Samsung_MLT_D101S"));
+        QVERIFY2(samsung != nullptr, "Профиль картриджа Samsung должен разрешаться в 24C08");
+        QCOMPARE(samsung->counterOffset, static_cast<quint32>(1022));
+        QCOMPARE(samsung->counterSize, static_cast<quint32>(2));
     }
 };
 

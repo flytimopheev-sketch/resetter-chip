@@ -13,6 +13,9 @@ class OperationsPanel : public QGroupBox
 public:
     explicit OperationsPanel(QWidget *parent = nullptr);
 
+    // Гранулярное состояние кнопок: каждая операция включается только тогда,
+    // когда для неё есть все необходимые данные.
+    void setState(bool connected, bool hasDump, bool hasCounter, bool dumpMatchesProfile);
     void setBusy(bool busy);
 
 signals:
@@ -28,6 +31,8 @@ signals:
     void cancelRequested();
 
 private:
+    void updateButtonStates();
+
     QPushButton *m_btnRead = nullptr;
     QPushButton *m_btnWrite = nullptr;
     QPushButton *m_btnVerify = nullptr;
@@ -39,7 +44,11 @@ private:
     QPushButton *m_btnCompare = nullptr;
     QPushButton *m_btnCancel = nullptr;
 
-    void setPanelEnabled(bool enabled);
+    bool m_connected = false;
+    bool m_hasDump = false;
+    bool m_hasCounter = false;
+    bool m_dumpMatchesProfile = false;
+    bool m_busy = false;
 };
 
 #endif // OPERATIONS_PANEL_H

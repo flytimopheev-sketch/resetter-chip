@@ -1,7 +1,9 @@
 #include "FileUtils.h"
-#include <QFile>
+
 #include <QDataStream>
+#include <QFile>
 #include <QFileInfo>
+#include <QSaveFile>
 
 std::optional<QByteArray> FileUtils::readBinaryFile(const QString &filePath)
 {
@@ -16,18 +18,21 @@ std::optional<QByteArray> FileUtils::readBinaryFile(const QString &filePath)
 
 bool FileUtils::writeBinaryFile(const QString &filePath, const QByteArray &data)
 {
-    QFile file(filePath);
+    // QSaveFile пишет во временный файл и атомарно переименовывает его:
+    // обрыв питания или переполнение диска не оставят نصف дампа.
+    QSaveFile file(filePath);
     if (!file.open(QIODevice::WriteOnly)) {
         return false;
     }
-    qint64 written = file.write(data);
-    file.close();
-    return written == data.size();
+    if (file.write(data) != data.size()) {
+        file.cancelWriting();
+        return false;
+    }
+    return file.commit();
 }
 
 quint32 FileUtils::calculateCRC32(const QByteArray &data)
 {
-    // Простая реализация CRC32 для контрольных сумм дампов
     quint32 crc = 0xFFFFFFFF;
     for (uchar byte : data) {
         crc ^= byte;
@@ -44,20 +49,23 @@ quint32 FileUtils::calculateCRC32(const QByteArray &data)
 
 QString FileUtils::formatHex(const QByteArray &data, int bytesPerLine)
 {
+    if (bytesPerLine <= 0) {
+        bytesPerLine = 16;
+    }
+
     QString result;
     for (int i = 0; i < data.size(); i += bytesPerLine) {
-        int chunkSize = qMin(bytesPerLine, data.size() - i);
+        const int chunkSize = qMin(bytesPerLine, data.size() - i);
         QString hexPart;
         QString asciiPart;
         for (int j = 0; j < chunkSize; ++j) {
-            uchar b = static_cast<uchar>(data[i + j]);
-            hexPart += QString("%1 ").arg(b, 2, 16, QLatin1Char('0')).toUpper();
-            asciiPart += (b >= 32 && b < 127) ? QChar(b) : QChar('.');
+            const uchar b = static_cast<uchar>(data.at(i + j));
+            hexPart += QStringLiteral("%1 ").arg(b, 2, 16, QLatin1Char('0')).toUpper();
+            asciiPart += (b >= 32 && b < 127) ? QChar(b) : QChar(QLatin1Char('.'));
         }
-        result += QString("%1:  %2  %3\n")
+        result += QStringLiteral("%1:  %2 %3\n")
                       .arg(i, 8, 16, QLatin1Char('0'))
-                      .arg(hexPart)
-                      .arg(asciiPart);
+                      .arg(hexPart, asciiPart);
     }
     return result;
 }
@@ -65,5 +73,5 @@ QString FileUtils::formatHex(const QByteArray &data, int bytesPerLine)
 bool FileUtils::fileExistsAndNotEmpty(const QString &filePath)
 {
     QFileInfo info(filePath);
-    return info.exists() && info.size() > 0;
+    return info.exists() && info.isFile() && info.size() > 0;
 }

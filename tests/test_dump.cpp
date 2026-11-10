@@ -70,6 +70,47 @@ private slots:
         QVERIFY(info.has_value());
         QCOMPARE(info->chipId, QString("24C02"));
         QCOMPARE(info->cartridgeModel, QString("Samsung"));
+        QVERIFY(info->crcValid);
+    }
+
+    void testRawDumpRoundTrip()
+    {
+        QTemporaryDir tmpDir;
+        QString filePath = tmpDir.path() + "/raw.bin";
+        QByteArray data("\x10\x20\x30\x40", 4);
+
+        QVERIFY(DumpManager::saveRawDump(filePath, data));
+
+        auto loaded = DumpManager::loadDump(filePath);
+        QVERIFY(loaded.has_value());
+        QCOMPARE(*loaded, data);
+
+        auto info = DumpManager::dumpInfo(filePath);
+        QVERIFY(info.has_value());
+        QVERIFY(!info->hasMetadata);
+    }
+
+    void testCorruptedContainerRejected()
+    {
+        QTemporaryDir tmpDir;
+        QString filePath = tmpDir.path() + "/corrupt.rchip";
+        QByteArray data(64, '\x42');
+        QVERIFY(DumpManager::saveDump(filePath, data, "24C02", "Test"));
+
+        QFile file(filePath);
+        QVERIFY(file.open(QIODevice::ReadWrite));
+        QByteArray raw = file.readAll();
+        QVERIFY(raw.size() > 12);
+        raw[raw.size() - 1] = static_cast<char>(raw.at(raw.size() - 1) ^ 0x5A);
+        file.seek(0);
+        QCOMPARE(file.write(raw), static_cast<qint64>(raw.size()));
+        file.close();
+
+        QVERIFY(!DumpManager::loadDump(filePath).has_value());
+
+        const auto info = DumpManager::dumpInfo(filePath);
+        QVERIFY(info.has_value());
+        QVERIFY(!info->crcValid);
     }
 };
 

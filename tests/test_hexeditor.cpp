@@ -48,6 +48,32 @@ private slots:
         editor.setPlainText(QStringLiteral("00000000:  AA BB |..|\n"));
         QCOMPARE(editor.dump(), data);
     }
+
+    void fillChangesAllBytes()
+    {
+        HexEditor editor;
+        const QByteArray data(32, '\x00');
+        editor.setDump(data);
+        QSignalSpy spy(&editor, &HexEditor::dataChanged);
+
+        editor.fill(0xFF);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(editor.dump(), QByteArray(32, '\xFF'));
+    }
+
+    void gotoAndFind()
+    {
+        HexEditor editor;
+        QByteArray data(64, '\x00');
+        data[0x2A] = '\x12';
+        data[0x2B] = '\x34';
+        editor.setDump(data);
+
+        QVERIFY(editor.gotoOffset(0x2A));
+        QVERIFY(editor.findBytes(QByteArray("\x12\x34", 2)));
+        QVERIFY(!editor.findBytes(QByteArray("\xDE\xAD", 2)));
+        QVERIFY(!editor.gotoOffset(0x1000));
+    }
 };
 
 QTEST_MAIN(TestHexEditor)

@@ -37,6 +37,7 @@ struct ChipOperationResult {
     QVector<quint8> detectedAddresses;
     int progress = 0;
     QString progressText;
+    QString backupPath;          // путь автоматической резервной копии перед записью
 };
 
 Q_DECLARE_METATYPE(ChipOperationResult)
@@ -56,7 +57,7 @@ public:
     void cancel();
 
 public slots:
-    void requestConnect(const QString &adapterName, quint8 chipAddress, const QString &profileId);
+    void requestConnect(const QString &adapterSpec, int chipAddress, const QString &profileId);
     void requestDisconnect();
     void requestScan(const QString &profileId);
     void requestRead(const QString &profileId);
@@ -79,7 +80,7 @@ private:
 
     std::atomic<bool> m_cancelled{false};
 
-    // Загрузить профиль по ID; при ошибке заполняет result
+    // Загрузить профиль по ID (чип или картридж); при ошибке заполняет result
     bool loadProfile(const QString &profileId, ChipOperationResult &result);
 
     // Применить параметры профиля к адаптеру
@@ -88,8 +89,10 @@ private:
     // Полное чтение чипа (с учётом размера профиля)
     ChipOperationResult readChip();
 
+    // Автоматическая резервная копия перед записью
+    bool saveSafetyBackup(const QByteArray &data, QString *filePath, QString *error);
+
     void reportProgress(int value, const QString &text);
 };
 
 #endif // CHIP_WORKER_H
-

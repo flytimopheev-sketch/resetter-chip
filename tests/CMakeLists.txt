@@ -13,6 +13,7 @@ add_Resetter_test(test_checksum)
 add_Resetter_test(test_dump)
 add_Resetter_test(test_profile)
 add_Resetter_test(test_validation)
+add_Resetter_test(test_protocol)
 
 # GUI-тест: hex-редактор требует QtWidgets
 add_executable(test_hexeditor test_hexeditor.cpp ${CMAKE_SOURCE_DIR}/src/gui/HexEditor.cpp)

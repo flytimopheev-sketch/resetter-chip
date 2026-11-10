@@ -19,9 +19,13 @@ pkg_check_modules(LIBUSB REQUIRED IMPORTED_TARGET libusb-1.0)
 add_library(Resetter_core STATIC
     src/utils/Logger.cpp
     src/utils/FileUtils.cpp
+    src/adapters/Ch341Protocol.cpp
     src/adapters/Ch341AI2cAdapter.cpp
+    src/adapters/SerialProtocol.cpp
+    src/adapters/SerialI2cAdapter.cpp
     src/adapters/AdapterFactory.cpp
     src/core/ChipProfile.cpp
+    src/core/CartridgeProfile.cpp
     src/core/ProfileManager.cpp
     src/core/DumpManager.cpp
     src/core/Checksum.cpp
@@ -49,20 +53,20 @@ target_link_libraries(Resetter-chip PRIVATE Resetter_core Qt6::Widgets)
 
 # Версия приложения приходит из project(), чтобы не дублировать её в коде
 target_compile_definitions(Resetter-chip PRIVATE
-    Resetter_CHIP_VERSION="${PROJECT_VERSION}")
+    RESETTER_CHIP_VERSION="${PROJECT_VERSION}")
 
 install(TARGETS Resetter-chip RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(FILES packaging/Resetter-chip.desktop
+install(FILES packaging/resetter-chip.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 install(FILES packaging/99-ch341a.rules
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/udev/rules.d)
-install(FILES packaging/Resetter-chip.svg
+        DESTINATION lib/udev/rules.d)
+install(FILES packaging/resetter-chip.svg
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
 install(DIRECTORY src/profiles/
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/Resetter-chip/profiles
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/resetter-chip/profiles
         FILES_MATCHING PATTERN "*.json")
 install(FILES README.md CHANGELOG.md
-        DESTINATION share/doc/Resetter-chip)
+        DESTINATION share/doc/resetter-chip)
 
 option(BUILD_TESTS "Сборка модульных тестов" OFF)
 if(BUILD_TESTS)

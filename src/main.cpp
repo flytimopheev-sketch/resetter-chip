@@ -7,15 +7,15 @@
 #include "utils/Logger.h"
 
 // Версия определяется CMake (project VERSION); значение ниже — запасное для IDE
-#ifndef Resetter_CHIP_VERSION
-#define Resetter_CHIP_VERSION "1.0.0"
+#ifndef RESETTER_CHIP_VERSION
+#define RESETTER_CHIP_VERSION "1.0.0"
 #endif
 
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Resetter Chip"));
-    app.setApplicationVersion(QStringLiteral(Resetter_CHIP_VERSION));
+    app.setApplicationVersion(QStringLiteral(RESETTER_CHIP_VERSION));
     app.setApplicationDisplayName(QStringLiteral("Resetter Chip"));
     app.setOrganizationName(QStringLiteral("ResetterChip"));
     app.setOrganizationDomain(QStringLiteral("Resetter-chip.local"));
@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
 
     Logger::instance().init(logDir + QStringLiteral("/Resetter-chip.log"));
     Logger::instance().info(QStringLiteral("Запуск Resetter Chip v")
-                            + QStringLiteral(Resetter_CHIP_VERSION));
+                            + QStringLiteral(RESETTER_CHIP_VERSION));
 
     // Профили чипов нужны до создания окна: их список попадает в интерфейс
     if (!ProfileManager::instance().loadDefaultProfiles()) {

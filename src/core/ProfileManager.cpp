@@ -9,6 +9,16 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QStandardPaths>
+
+namespace {
+constexpr quint32 kCounterUnset = 0xFFFFFFFFu;
+
+bool looksLikeCartridgeProfile(const QJsonObject &obj)
+{
+    return obj.contains(QStringLiteral("chip_profile"));
+}
+} // namespace
 
 ProfileManager &ProfileManager::instance()
 {
@@ -16,14 +26,46 @@ ProfileManager &ProfileManager::instance()
     return inst;
 }
 
-void ProfileManager::addProfile(const ChipProfile &profile)
+void ProfileManager::clear()
 {
-    if (profile.id.isEmpty() || profile.sizeBytes == 0) {
-        return;
+    m_profiles.clear();
+    m_cartridges.clear();
+}
+
+bool ProfileManager::addChipProfile(const ChipProfile &profile)
+{
+    if (!profile.isValid()) {
+        Logger::instance().warning(QStringLiteral("Профиль чипа пропущен (некорректные поля): %1")
+                                      .arg(profile.id.isEmpty() ? QStringLiteral("<без id>") : profile.id));
+        return false;
     }
+
+    if (m_profiles.contains(profile.id)) {
+        Logger::instance().warning(QStringLiteral("Профиль чипа %1 переопределён").arg(profile.id));
+    }
+
     m_profiles.insert(profile.id, std::make_shared<ChipProfile>(profile));
     Logger::instance().info(QStringLiteral("Загружен профиль чипа: %1 (%2)")
                                 .arg(profile.id, profile.name));
+    return true;
+}
+
+bool ProfileManager::addCartridgeProfile(const CartridgeProfile &profile)
+{
+    if (!profile.isValid()) {
+        Logger::instance().warning(QStringLiteral("Профиль картриджа пропущен (некорректные поля): %1")
+                                      .arg(profile.id.isEmpty() ? QStringLiteral("<без id>") : profile.id));
+        return false;
+    }
+
+    if (m_cartridges.contains(profile.id)) {
+        Logger::instance().warning(QStringLiteral("Профиль картриджа %1 переопределён").arg(profile.id));
+    }
+
+    m_cartridges.insert(profile.id, std::make_shared<CartridgeProfile>(profile));
+    Logger::instance().info(QStringLiteral("Загружен профиль картриджа: %1 (%2)")
+                                .arg(profile.id, profile.name));
+    return true;
 }
 
 bool ProfileManager::loadFile(const QString &filePath)
@@ -47,28 +89,27 @@ bool ProfileManager::loadFile(const QString &filePath)
 
     bool loadedAny = false;
 
+    const auto loadObject = [this, &loadedAny](const QJsonObject &obj) {
+        if (looksLikeCartridgeProfile(obj)) {
+            loadedAny = addCartridgeProfile(CartridgeProfile::fromJson(obj)) || loadedAny;
+        } else {
+            loadedAny = addChipProfile(ChipProfile::fromJson(obj)) || loadedAny;
+        }
+    };
+
     if (doc.isArray()) {
         const QJsonArray items = doc.array();
         for (const QJsonValue &value : items) {
-            if (!value.isObject()) {
-                continue;
-            }
-            const ChipProfile profile = ChipProfile::fromJson(value.toObject());
-            if (!profile.id.isEmpty() && profile.sizeBytes > 0) {
-                addProfile(profile);
-                loadedAny = true;
+            if (value.isObject()) {
+                loadObject(value.toObject());
             }
         }
     } else if (doc.isObject()) {
-        const ChipProfile profile = ChipProfile::fromJson(doc.object());
-        if (!profile.id.isEmpty() && profile.sizeBytes > 0) {
-            addProfile(profile);
-            loadedAny = true;
-        }
+        loadObject(doc.object());
     }
 
     if (!loadedAny) {
-        Logger::instance().info(QStringLiteral("Файл не содержит профилей чипов (пропущен): ") + filePath);
+        Logger::instance().info(QStringLiteral("Файл не содержит корректных профилей (пропущен): ") + filePath);
     }
 
     return loadedAny;
@@ -82,37 +123,52 @@ bool ProfileManager::loadProfiles(const QString &directoryPath)
         return false;
     }
 
+    bool loadedAny = false;
     const QFileInfoList files = dir.entryInfoList({QStringLiteral("*.json")}, QDir::Files, QDir::Name);
     for (const QFileInfo &info : files) {
-        loadFile(info.absoluteFilePath());
+        loadedAny = loadFile(info.absoluteFilePath()) || loadedAny;
     }
 
-    return !m_profiles.isEmpty();
+    return loadedAny;
 }
 
 QString ProfileManager::defaultProfilesDirectory()
 {
-    // 1) Явное переопределение через переменную окружения
-    const QByteArray envPath = qgetenv("Resetter_CHIP_PROFILES");
+    // Основное имя переменной — в верхнем регистре; старое имя оставлено
+    // для совместимости с версией 1.0.0.
+    QByteArray envPath = qgetenv("RESETTER_CHIP_PROFILES");
+    if (envPath.isEmpty()) {
+        envPath = qgetenv("Resetter_CHIP_PROFILES");
+    }
     if (!envPath.isEmpty()) {
         const QString path = QString::fromLocal8Bit(envPath);
         if (QDir(path).exists()) {
             return path;
         }
+        Logger::instance().warning(QStringLiteral("Каталог из RESETTER_CHIP_PROFILES не найден: ") + path);
     }
 
     QStringList candidates;
 
-    // 2) Каталог рядом с исполняемым файлом (для сборки и для установки)
+    // Каталог профилей пользователя (можно добавлять свои картриджи)
+    const QString userData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (!userData.isEmpty()) {
+        candidates << userData + QStringLiteral("/profiles");
+    }
+
+    // Каталог рядом с исполняемым файлом (для сборки и для установки)
     const QString appDir = QCoreApplication::applicationDirPath();
     candidates << appDir + QStringLiteral("/profiles")
-               << appDir + QStringLiteral("/../share/Resetter-chip/profiles")
+               << appDir + QStringLiteral("/../share/resetter-chip/profiles")
+               << appDir + QStringLiteral("/../../share/resetter-chip/profiles")
                << appDir + QStringLiteral("/../src/profiles")
                << appDir + QStringLiteral("/../../src/profiles");
 
-    // 3) Системные пути установки
+    // Системные пути установки (сначала актуальное имя, затем старое)
 #ifdef Q_OS_UNIX
-    candidates << QStringLiteral("/usr/share/Resetter-chip/profiles")
+    candidates << QStringLiteral("/usr/share/resetter-chip/profiles")
+               << QStringLiteral("/usr/local/share/resetter-chip/profiles")
+               << QStringLiteral("/usr/share/Resetter-chip/profiles")
                << QStringLiteral("/usr/local/share/Resetter-chip/profiles");
 #endif
 
@@ -139,16 +195,73 @@ bool ProfileManager::loadDefaultProfiles()
 
 std::shared_ptr<ChipProfile> ProfileManager::profile(const QString &id) const
 {
-    const auto it = m_profiles.constFind(id);
-    if (it != m_profiles.constEnd()) {
-        return it.value();
+    return m_profiles.value(id, nullptr);
+}
+
+std::shared_ptr<ChipProfile> ProfileManager::resolveProfile(const QString &id) const
+{
+    const auto chip = m_profiles.value(id, nullptr);
+    if (chip) {
+        return chip;
     }
-    return nullptr;
+
+    const auto cartridge = m_cartridges.value(id, nullptr);
+    if (!cartridge) {
+        return nullptr;
+    }
+
+    const auto base = m_profiles.value(cartridge->chipProfileId, nullptr);
+    if (!base) {
+        Logger::instance().error(QStringLiteral("Для картриджа %1 не найден профиль чипа %2")
+                                     .arg(cartridge->id, cartridge->chipProfileId));
+        return nullptr;
+    }
+
+    auto resolved = std::make_shared<ChipProfile>(*base);
+
+    if (cartridge->counterOffset != kCounterUnset) {
+        resolved->counterOffset = cartridge->counterOffset;
+    }
+    if (cartridge->counterSize != 0) {
+        resolved->counterSize = cartridge->counterSize;
+    }
+
+    if (!cartridge->protectedRanges.isEmpty()) {
+        resolved->protectedRanges.clear();
+        for (const CartridgeRange &range : cartridge->protectedRanges) {
+            resolved->protectedRanges.append(qMakePair(range.start, range.end));
+        }
+    }
+
+    if (!cartridge->allowedModifyRanges.isEmpty()) {
+        resolved->allowedRanges.clear();
+        for (const CartridgeRange &range : cartridge->allowedModifyRanges) {
+            resolved->allowedRanges.append(qMakePair(range.start, range.end));
+        }
+    }
+
+    if (!resolved->isValid()) {
+        Logger::instance().error(QStringLiteral("Профиль картриджа %1 содержит некорректные переопределения")
+                                     .arg(cartridge->id));
+        return nullptr;
+    }
+
+    return resolved;
+}
+
+std::shared_ptr<CartridgeProfile> ProfileManager::cartridgeProfile(const QString &id) const
+{
+    return m_cartridges.value(id, nullptr);
 }
 
 QVector<QString> ProfileManager::profileIds() const
 {
-    return m_profiles.keys().toVector();
+    return m_profiles.keys();
+}
+
+QVector<QString> ProfileManager::cartridgeProfileIds() const
+{
+    return m_cartridges.keys();
 }
 
 QVector<std::shared_ptr<ChipProfile>> ProfileManager::eepromProfiles() const
@@ -162,3 +275,11 @@ QVector<std::shared_ptr<ChipProfile>> ProfileManager::eepromProfiles() const
     return result;
 }
 
+QVector<std::shared_ptr<CartridgeProfile>> ProfileManager::cartridgeProfiles() const
+{
+    QVector<std::shared_ptr<CartridgeProfile>> result;
+    for (auto it = m_cartridges.constBegin(); it != m_cartridges.constEnd(); ++it) {
+        result.append(it.value());
+    }
+    return result;
+}

@@ -1,71 +1,53 @@
 #include "CounterReset.h"
-#include <cstring>
-#include <QDebug>
+
+namespace {
+constexpr quint32 kCounterUnset = 0xFFFFFFFFu;
+
+bool counterFits(const ChipProfile &profile, int dataSize)
+{
+    if (profile.counterOffset == kCounterUnset) {
+        return false;
+    }
+    if (profile.counterSize != 1 && profile.counterSize != 2 && profile.counterSize != 4) {
+        return false;
+    }
+
+    const quint64 end = static_cast<quint64>(profile.counterOffset) + profile.counterSize;
+    return end <= static_cast<quint64>(dataSize);
+}
+} // namespace
 
 std::optional<quint32> CounterReset::readCounter(const QByteArray &data, const ChipProfile &profile)
 {
-    if (profile.counterOffset == 0xFFFFFFFF) {
-        return std::nullopt;
-    }
-    if (profile.counterOffset + profile.counterSize > data.size()) {
+    if (!counterFits(profile, data.size())) {
         return std::nullopt;
     }
 
     quint32 value = 0;
-    switch (profile.counterSize) {
-    case 1:
-        value = static_cast<quint8>(data[profile.counterOffset]);
-        break;
-    case 2: {
-        quint16 val;
-        memcpy(&val, data.constData() + profile.counterOffset, 2);
-        value = val;
-        break;
-    }
-    case 4:
-        memcpy(&value, data.constData() + profile.counterOffset, 4);
-        break;
-    default:
-        return std::nullopt;
+    for (quint32 i = 0; i < profile.counterSize; ++i) {
+        const quint8 byte = static_cast<quint8>(data.at(static_cast<int>(profile.counterOffset + i)));
+        value |= static_cast<quint32>(byte) << (8u * i);
     }
     return value;
 }
 
 bool CounterReset::setCounter(QByteArray &data, const ChipProfile &profile, quint32 newValue)
 {
-    if (profile.counterOffset == 0xFFFFFFFF) {
-        return false;
-    }
-    if (profile.counterOffset + profile.counterSize > data.size()) {
+    if (!counterFits(profile, data.size())) {
         return false;
     }
 
-    switch (profile.counterSize) {
-    case 1:
-        data[profile.counterOffset] = static_cast<char>(newValue & 0xFF);
-        break;
-    case 2: {
-        quint16 val = static_cast<quint16>(newValue & 0xFFFF);
-        memcpy(data.data() + profile.counterOffset, &val, 2);
-        break;
-    }
-    case 4:
-        memcpy(data.data() + profile.counterOffset, &newValue, 4);
-        break;
-    default:
-        return false;
+    const quint32 value = newValue & profile.counterMaxValue();
+    for (quint32 i = 0; i < profile.counterSize; ++i) {
+        const quint8 byte = static_cast<quint8>((value >> (8u * i)) & 0xFFu);
+        data[static_cast<int>(profile.counterOffset + i)] = static_cast<char>(byte);
     }
     return true;
 }
 
 std::optional<QByteArray> CounterReset::resetCounter(QByteArray data, const ChipProfile &profile)
 {
-    if (profile.counterOffset == 0xFFFFFFFF) {
-        return std::nullopt;
-    }
-
-    bool ok = setCounter(data, profile, 0);
-    if (!ok) {
+    if (!setCounter(data, profile, 0)) {
         return std::nullopt;
     }
     return data;

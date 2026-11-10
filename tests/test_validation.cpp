@@ -82,6 +82,44 @@ private slots:
         QVERIFY(!CounterReset::readCounter(data, profile).has_value());
         QVERIFY(!CounterReset::resetCounter(data, profile).has_value());
     }
+
+    void counterLittleEndian4Bytes()
+    {
+        ChipProfile profile = makeProfile();
+        profile.counterOffset = 0x100;
+        profile.counterSize = 4;
+
+        QByteArray data(2048, '\0');
+        data[0x100] = '\x78';
+        data[0x101] = '\x56';
+        data[0x102] = '\x34';
+        data[0x103] = '\x12';
+
+        const auto value = CounterReset::readCounter(data, profile);
+        QVERIFY(value.has_value());
+        QCOMPARE(*value, static_cast<quint32>(0x12345678));
+
+        QVERIFY(CounterReset::setCounter(data, profile, 0xABCDEF01));
+        QCOMPARE(static_cast<quint8>(data.at(0x100)), static_cast<quint8>(0x01));
+        QCOMPARE(static_cast<quint8>(data.at(0x101)), static_cast<quint8>(0xEF));
+        QCOMPARE(static_cast<quint8>(data.at(0x102)), static_cast<quint8>(0xCD));
+        QCOMPARE(static_cast<quint8>(data.at(0x103)), static_cast<quint8>(0xAB));
+    }
+
+    void allowedRangesRestrictChanges()
+    {
+        QByteArray original(64, '\0');
+        QByteArray modified = original;
+        modified[0x10] = '\x01';
+
+        const QVector<QPair<quint32, quint32>> allowed = {qMakePair<quint32, quint32>(0x10, 0x20)};
+        QVERIFY(Validator::validateChanges(original, modified, allowed));
+
+        modified[0x30] = '\x02';
+        QString error;
+        QVERIFY(!Validator::validateChanges(original, modified, allowed, &error));
+        QVERIFY(error.contains(QStringLiteral("0x0030")));
+    }
 };
 
 QTEST_MAIN(TestValidation)

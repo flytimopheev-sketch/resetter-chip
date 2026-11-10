@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE_NAME="Resetter-chip-builder"
+IMAGE_NAME="resetter-chip-builder"
 OUTPUT_DIR="${SCRIPT_DIR}/output"
 
 mkdir -p "${OUTPUT_DIR}"

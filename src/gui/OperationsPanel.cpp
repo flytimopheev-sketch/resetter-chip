@@ -38,23 +38,40 @@ OperationsPanel::OperationsPanel(QWidget *parent)
     connect(m_btnCompare, &QPushButton::clicked, this, &OperationsPanel::compareDumpsRequested);
     connect(m_btnCancel, &QPushButton::clicked, this, &OperationsPanel::cancelRequested);
 
-    m_btnCancel->setEnabled(false);
-    setPanelEnabled(false);
+    updateButtonStates();
 }
 
-void OperationsPanel::setPanelEnabled(bool enabled)
+void OperationsPanel::setState(bool connected, bool hasDump, bool hasCounter,
+                               bool dumpMatchesProfile)
 {
-    // Намеренно не вызываем QGroupBox::setEnabled напрямую —
-    // управляем кнопками, чтобы панель оставалась читаемой
-    for (QPushButton *btn : {m_btnRead, m_btnWrite, m_btnVerify, m_btnSaveDump,
-                             m_btnOpenDump, m_btnResetCounter, m_btnBackup,
-                             m_btnRestore, m_btnCompare}) {
-        btn->setEnabled(enabled);
-    }
+    m_connected = connected;
+    m_hasDump = hasDump;
+    m_hasCounter = hasCounter;
+    m_dumpMatchesProfile = dumpMatchesProfile;
+    updateButtonStates();
 }
 
 void OperationsPanel::setBusy(bool busy)
 {
-    setPanelEnabled(!busy);
-    m_btnCancel->setEnabled(busy);
+    m_busy = busy;
+    updateButtonStates();
+}
+
+void OperationsPanel::updateButtonStates()
+{
+    const bool idle = !m_busy;
+    const bool dumpReady = m_hasDump && m_dumpMatchesProfile;
+
+    m_btnRead->setEnabled(m_connected && idle);
+    m_btnWrite->setEnabled(m_connected && dumpReady && idle);
+    m_btnVerify->setEnabled(m_connected && dumpReady && idle);
+    m_btnResetCounter->setEnabled(dumpReady && m_hasCounter && idle);
+
+    m_btnSaveDump->setEnabled(m_hasDump && idle);
+    m_btnOpenDump->setEnabled(idle);
+    m_btnBackup->setEnabled(m_hasDump && idle);
+    m_btnRestore->setEnabled(idle);
+    m_btnCompare->setEnabled(m_hasDump && idle);
+
+    m_btnCancel->setEnabled(m_busy);
 }

@@ -24,26 +24,25 @@ enum class ErrorCode {
 };
 
 // Человекочитаемое описание кода ошибки.
-// Единственный экземпляр таблицы на всю программу (без копий в каждом .cpp).
 inline QString errorToString(ErrorCode code)
 {
     switch (code) {
-    case ErrorCode::Success:               return QStringLiteral("Операция выполнена успешно");
-    case ErrorCode::AdapterNotFound:       return QStringLiteral("Программатор CH341A не найден");
-    case ErrorCode::AdapterOpenFailed:     return QStringLiteral("Не удалось открыть USB-устройство: недостаточно прав");
-    case ErrorCode::AdapterNotOpened:      return QStringLiteral("Программатор не открыт");
-    case ErrorCode::ChipNotResponding:     return QStringLiteral("Чип не отвечает по указанному I2C-адресу");
-    case ErrorCode::InvalidChipSize:       return QStringLiteral("Размер дампа не соответствует выбранному чипу");
-    case ErrorCode::ChecksumMismatch:      return QStringLiteral("Контрольная сумма не совпадает");
+    case ErrorCode::Success:                 return QStringLiteral("Операция выполнена успешно");
+    case ErrorCode::AdapterNotFound:         return QStringLiteral("Программатор не найден");
+    case ErrorCode::AdapterOpenFailed:       return QStringLiteral("Не удалось открыть программатор");
+    case ErrorCode::AdapterNotOpened:        return QStringLiteral("Программатор не открыт");
+    case ErrorCode::ChipNotResponding:       return QStringLiteral("Чип не отвечает по указанному I2C-адресу");
+    case ErrorCode::InvalidChipSize:         return QStringLiteral("Размер дампа не соответствует выбранному чипу");
+    case ErrorCode::ChecksumMismatch:        return QStringLiteral("Контрольная сумма не совпадает");
     case ErrorCode::WriteVerificationFailed: return QStringLiteral("Запись завершена, но верификация не пройдена");
-    case ErrorCode::ProtectedArea:         return QStringLiteral("Область памяти защищена профилем чипа");
-    case ErrorCode::BackupNotFound:        return QStringLiteral("Не найдена резервная копия");
-    case ErrorCode::InsufficientPermissions: return QStringLiteral("Недостаточно прав для доступа к USB-устройству");
-    case ErrorCode::InvalidProfile:        return QStringLiteral("Неверный или отсутствующий профиль чипа");
-    case ErrorCode::FileReadError:         return QStringLiteral("Ошибка чтения файла");
-    case ErrorCode::FileWriteError:        return QStringLiteral("Ошибка записи файла");
-    case ErrorCode::OperationCancelled:    return QStringLiteral("Операция отменена пользователем");
-    case ErrorCode::UnknownError:          return QStringLiteral("Неизвестная ошибка");
+    case ErrorCode::ProtectedArea:           return QStringLiteral("Область памяти защищена профилем чипа");
+    case ErrorCode::BackupNotFound:          return QStringLiteral("Не найдена резервная копия");
+    case ErrorCode::InsufficientPermissions: return QStringLiteral("Недостаточно прав для доступа к устройству");
+    case ErrorCode::InvalidProfile:          return QStringLiteral("Неверный или отсутствующий профиль чипа");
+    case ErrorCode::FileReadError:           return QStringLiteral("Ошибка чтения файла");
+    case ErrorCode::FileWriteError:          return QStringLiteral("Ошибка записи файла");
+    case ErrorCode::OperationCancelled:      return QStringLiteral("Операция отменена пользователем");
+    case ErrorCode::UnknownError:            return QStringLiteral("Неизвестная ошибка");
     }
     return QStringLiteral("Неизвестная ошибка");
 }

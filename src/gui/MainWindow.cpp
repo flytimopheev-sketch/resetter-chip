@@ -12,11 +12,13 @@
 #include "utils/Logger.h"
 
 #include <QCloseEvent>
+#include <QDir>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QMessageBox>
 #include <QMetaObject>
-#include <QStringList>
 #include <QSplitter>
+#include <QStringList>
 #include <QThread>
 #include <QVBoxLayout>
 
@@ -35,6 +37,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_connectionPanel->setConnected(false);
     m_cartridgePanel->setInfoEnabled(false);
     m_operationsPanel->setBusy(false);
+    updateActions();
 
     Logger::instance().info(QStringLiteral("Главное окно инициализировано"));
 }
@@ -47,11 +50,14 @@ MainWindow::~MainWindow()
 
     if (m_workerThread) {
         m_workerThread->quit();
-        m_workerThread->wait(3000);
+        if (!m_workerThread->wait(15000)) {
+            Logger::instance().warning(
+                QStringLiteral("Рабочий поток не завершился за 15 секунд, ожидание продолжено"));
+            m_workerThread->wait();
+        }
     }
 
-    // Воркер удаляем после остановки потока
-    delete m_worker;
+    // ChipWorker удаляется через QThread::finished -> deleteLater
     m_worker = nullptr;
 
     Logger::instance().info(QStringLiteral("Завершение работы приложения"));
@@ -103,6 +109,7 @@ void MainWindow::setupWorker()
     m_worker = new ChipWorker();
     m_worker->moveToThread(m_workerThread);
 
+    connect(m_workerThread, &QThread::finished, m_worker, &QObject::deleteLater);
     connect(m_worker, &ChipWorker::operationResult,
             this, &MainWindow::onWorkerResult, Qt::QueuedConnection);
     connect(m_worker, &ChipWorker::operationProgress,
@@ -152,25 +159,40 @@ void MainWindow::setupConnections()
 void MainWindow::loadProfiles()
 {
     ProfileManager &manager = ProfileManager::instance();
-    if (manager.count() == 0) {
+    if (manager.count() == 0 && manager.cartridgeCount() == 0) {
         manager.loadDefaultProfiles();
     }
 
-    QStringList ids;
+    QStringList chipIds;
     for (const QString &id : manager.profileIds()) {
-        ids << id;
+        chipIds << id;
     }
-    ids.sort();
+    chipIds.sort();
 
-    if (ids.isEmpty()) {
-        m_logPanel->addMessage(QStringLiteral("Профили чипов не загружены — операции недоступны"), "error");
+    QStringList cartridgeIds;
+    for (const QString &id : manager.cartridgeProfileIds()) {
+        cartridgeIds << id;
+    }
+    cartridgeIds.sort();
+
+    if (chipIds.isEmpty() && cartridgeIds.isEmpty()) {
+        m_logPanel->addMessage(
+            QStringLiteral("Профили не загружены — операции недоступны. "
+                           "Проверьте каталог профилей или переменную RESETTER_CHIP_PROFILES"),
+            "error");
+        updateActions();
         return;
     }
 
-    m_connectionPanel->setProfileIds(ids);
+    m_connectionPanel->setProfiles(chipIds, cartridgeIds);
     m_profileId = m_connectionPanel->selectedProfile();
+    updateProfileInfo();
+    updateTitle();
+    updateActions();
 
-    m_logPanel->addMessage(QStringLiteral("Загружено профилей чипов: %1").arg(ids.size()));
+    m_logPanel->addMessage(QStringLiteral("Загружено профилей: чипов %1, картриджей %2")
+                               .arg(chipIds.size())
+                               .arg(cartridgeIds.size()));
 }
 
 void MainWindow::updateTitle()
@@ -183,9 +205,42 @@ void MainWindow::updateTitle()
     setWindowTitle(title);
 }
 
+void MainWindow::updateProfileInfo()
+{
+    ProfileManager &manager = ProfileManager::instance();
+    const auto cartridge = manager.cartridgeProfile(m_profileId);
+
+    if (cartridge) {
+        QString model = cartridge->cartridgeModels.value(0);
+        if (model.isEmpty()) {
+            model = cartridge->name;
+        }
+        m_cartridgePanel->setCartridgeModel(model);
+        m_cartridgePanel->setChipId(cartridge->chipProfileId);
+    } else {
+        m_cartridgePanel->setCartridgeModel(QString());
+        m_cartridgePanel->setChipId(m_profileId);
+    }
+
+    const auto resolved = manager.resolveProfile(m_profileId);
+    if (resolved && !m_connected) {
+        m_connectionPanel->setChipAddress(resolved->i2cAddress);
+    }
+}
+
+void MainWindow::updateActions()
+{
+    const auto resolved = ProfileManager::instance().resolveProfile(currentProfileId());
+    const bool hasCounter = resolved && resolved->counterOffset != 0xFFFFFFFFu
+                            && resolved->counterSize > 0;
+    m_operationsPanel->setState(m_connected, m_hasDump, hasCounter,
+                                dumpMatchesCurrentProfile());
+}
+
 void MainWindow::setBusy(bool busy)
 {
     m_busy = busy;
+    m_connectionPanel->setBusy(busy);
     m_operationsPanel->setBusy(busy);
 }
 
@@ -202,31 +257,96 @@ QString MainWindow::currentProfileId() const
     return m_profileId.isEmpty() ? m_connectionPanel->selectedProfile() : m_profileId;
 }
 
+bool MainWindow::dumpMatchesCurrentProfile() const
+{
+    if (!m_hasDump) {
+        return false;
+    }
+    const auto profile = ProfileManager::instance().resolveProfile(currentProfileId());
+    return profile && static_cast<quint32>(m_currentDump.size()) == profile->sizeBytes;
+}
+
 void MainWindow::setDumpAvailable(bool available)
 {
     m_hasDump = available;
     m_statusBar->setDumpLoaded(available, m_currentDump.size());
+    updateActions();
 }
 
 void MainWindow::applyDump(const QByteArray &dump, const QString &chipId)
 {
     m_currentDump = dump;
+    m_hexEditor->setDump(dump);
 
-    if (chipId.isEmpty()) {
-        m_hexEditor->setDump(dump);
-    } else {
-        m_hexEditor->setDump(dump);
+    if (!chipId.isEmpty()) {
         m_cartridgePanel->setChipId(chipId);
     }
 
     setDumpAvailable(!dump.isEmpty());
     m_statusBar->setModified(false);
+    updateChipInfoFromDump(dump);
+}
+
+void MainWindow::selectProfileForDump(const QByteArray &dump, const QString &preferredProfileId)
+{
+    ProfileManager &manager = ProfileManager::instance();
+
+    if (!preferredProfileId.isEmpty()) {
+        const auto preferred = manager.resolveProfile(preferredProfileId);
+        if (preferred && static_cast<quint32>(dump.size()) == preferred->sizeBytes
+            && m_connectionPanel->selectProfile(preferredProfileId)) {
+            m_profileId = preferredProfileId;
+            updateProfileInfo();
+            updateTitle();
+            return;
+        }
+    }
+
+    if (dumpMatchesCurrentProfile()) {
+        return;
+    }
+
+    QStringList candidates;
+    for (const auto &profile : manager.eepromProfiles()) {
+        if (static_cast<quint32>(dump.size()) == profile->sizeBytes) {
+            candidates << profile->id;
+        }
+    }
+    candidates.sort();
+
+    if (candidates.size() == 1 && m_connectionPanel->selectProfile(candidates.first())) {
+        m_profileId = candidates.first();
+        updateProfileInfo();
+        updateTitle();
+        m_logPanel->addMessage(
+            QStringLiteral("По размеру дампа автоматически выбран профиль %1").arg(m_profileId),
+            "info");
+        return;
+    }
+
+    if (!candidates.isEmpty()) {
+        m_logPanel->addMessage(
+            QStringLiteral("Дамп %1 байт подходит к профилям: %2. Выберите нужный вручную.")
+                .arg(dump.size())
+                .arg(candidates.join(QStringLiteral(", "))),
+            "warning");
+    } else {
+        m_logPanel->addMessage(
+            QStringLiteral("Для дампа размером %1 байт нет подходящего профиля чипа")
+                .arg(dump.size()),
+            "warning");
+    }
 }
 
 void MainWindow::onProfileChanged(const QString &profileId)
 {
     m_profileId = profileId;
+    updateProfileInfo();
     updateTitle();
+    if (m_hasDump) {
+        updateChipInfoFromDump(m_currentDump);
+    }
+    updateActions();
 }
 
 void MainWindow::onConnectRequested()
@@ -237,18 +357,26 @@ void MainWindow::onConnectRequested()
 
     const QString profileId = currentProfileId();
     if (profileId.isEmpty()) {
-        showError(QStringLiteral("Ошибка"), QStringLiteral("Не выбран профиль чипа"));
+        showError(QStringLiteral("Ошибка"), QStringLiteral("Не выбран профиль чипа или картриджа"));
+        return;
+    }
+
+    QString specError;
+    const QString adapterSpec = m_connectionPanel->adapterSpec(&specError);
+    if (adapterSpec.isEmpty()) {
+        showError(QStringLiteral("Ошибка подключения"), specError);
         return;
     }
 
     setBusy(true);
     m_statusBar->setProgress(0, QStringLiteral("Подключение программатора..."));
-    m_logPanel->addMessage(QStringLiteral("Подключение: %1, чип %2")
-                               .arg(m_connectionPanel->selectedAdapter(), profileId));
+    m_logPanel->addMessage(QStringLiteral("Подключение: %1; профиль %2; адрес 0x%3")
+                               .arg(adapterSpec, profileId)
+                               .arg(m_connectionPanel->chipAddress(), 2, 16, QLatin1Char('0')));
 
     QMetaObject::invokeMethod(m_worker, "requestConnect", Qt::QueuedConnection,
-                              Q_ARG(QString, m_connectionPanel->selectedAdapter()),
-                              Q_ARG(quint8, m_connectionPanel->chipAddress()),
+                              Q_ARG(QString, adapterSpec),
+                              Q_ARG(int, static_cast<int>(m_connectionPanel->chipAddress())),
                               Q_ARG(QString, profileId));
 }
 
@@ -301,14 +429,22 @@ void MainWindow::onWriteRequested()
         showError(QStringLiteral("Ошибка"), QStringLiteral("Нет дампа для записи"));
         return;
     }
+    if (!dumpMatchesCurrentProfile()) {
+        showError(QStringLiteral("Ошибка"),
+                  QStringLiteral("Размер дампа не соответствует выбранному профилю %1")
+                      .arg(currentProfileId()));
+        return;
+    }
 
     const QByteArray data = m_hexEditor->dump();
-
     const auto answer = QMessageBox::question(
         this, QStringLiteral("Подтверждение записи"),
-        QStringLiteral("Записать в чип %1 байт?\n\n"
-                       "Перед записью будет прочитан исходный дамп и проверены защищённые зоны.")
-            .arg(data.size()),
+        QStringLiteral("Записать в чип %1 байт (профиль %2)?\n\n"
+                       "Перед записью исходное содержимое чипа будет прочитано и сохранено "
+                       "в автоматическую резервную копию.\n"
+                       "После записи данные будут проверены автоматически.")
+            .arg(data.size())
+            .arg(currentProfileId()),
         QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 
     if (answer != QMessageBox::Yes) {
@@ -329,8 +465,9 @@ void MainWindow::onVerifyRequested()
     if (m_busy || !m_connected) {
         return;
     }
-    if (!m_hasDump) {
-        showError(QStringLiteral("Ошибка"), QStringLiteral("Нет дампа для сравнения"));
+    if (!m_hasDump || !dumpMatchesCurrentProfile()) {
+        showError(QStringLiteral("Ошибка"),
+                  QStringLiteral("Нет дампа, соответствующего выбранному профилю"));
         return;
     }
 
@@ -348,12 +485,21 @@ void MainWindow::onResetCounterRequested()
     if (m_busy) {
         return;
     }
-    if (!m_hasDump) {
+    if (!m_hasDump || !dumpMatchesCurrentProfile()) {
         showError(QStringLiteral("Ошибка"), QStringLiteral("Сначала прочитайте дамп чипа"));
         return;
     }
 
+    const auto profile = ProfileManager::instance().resolveProfile(currentProfileId());
+    if (!profile || profile->counterOffset == 0xFFFFFFFFu) {
+        showError(QStringLiteral("Ошибка"),
+                  QStringLiteral("В профиле %1 не задано смещение счётчика")
+                      .arg(currentProfileId()));
+        return;
+    }
+
     setBusy(true);
+    m_logPanel->addMessage(QStringLiteral("Обнуление счётчика %1...").arg(currentProfileId()));
     QMetaObject::invokeMethod(m_worker, "requestResetCounter", Qt::QueuedConnection,
                               Q_ARG(QByteArray, m_hexEditor->dump()),
                               Q_ARG(QString, currentProfileId()));
@@ -361,35 +507,47 @@ void MainWindow::onResetCounterRequested()
 
 void MainWindow::onBackupRequested()
 {
+    if (m_busy) {
+        return;
+    }
     if (!m_hasDump) {
         showError(QStringLiteral("Ошибка"), QStringLiteral("Нет данных для резервного копирования"));
         return;
     }
 
+    setBusy(true);
     QMetaObject::invokeMethod(m_worker, "requestBackup", Qt::QueuedConnection,
                               Q_ARG(QByteArray, m_hexEditor->dump()),
-                              Q_ARG(QString, m_cartridgePanel->chipId().isEmpty()
-                                                 ? currentProfileId()
-                                                 : m_cartridgePanel->chipId()),
+                              Q_ARG(QString, currentProfileId()),
                               Q_ARG(QString, m_cartridgePanel->cartridgeModel()));
 }
 
 void MainWindow::onRestoreRequested()
 {
+    if (m_busy) {
+        return;
+    }
+
     const QString path = QFileDialog::getOpenFileName(
         this, QStringLiteral("Открыть резервную копию"),
-        DumpManager::backupDirectory(), QStringLiteral("Дампы (*.bin);;Все файлы (*)"));
+        DumpManager::backupDirectory(),
+        QStringLiteral("Дампы Resetter (*.rchip);;Сырые дампы (*.bin);;Все файлы (*)"));
     if (path.isEmpty()) {
         return;
     }
 
+    setBusy(true);
+    m_logPanel->addMessage(QStringLiteral("Загрузка резервной копии: %1").arg(path));
     QMetaObject::invokeMethod(m_worker, "requestRestore", Qt::QueuedConnection,
                               Q_ARG(QString, path),
-                              Q_ARG(QString, QString()));
+                              Q_ARG(QString, currentProfileId()));
 }
 
 void MainWindow::onCompareRequested()
 {
+    if (m_busy) {
+        return;
+    }
     if (!m_hasDump) {
         showError(QStringLiteral("Ошибка"), QStringLiteral("Сначала прочитайте или откройте дамп"));
         return;
@@ -397,7 +555,7 @@ void MainWindow::onCompareRequested()
 
     const QString path = QFileDialog::getOpenFileName(
         this, QStringLiteral("Выберите дамп для сравнения"), QString(),
-        QStringLiteral("Дампы (*.bin);;Все файлы (*)"));
+        QStringLiteral("Дампы Resetter (*.rchip);;Сырые дампы (*.bin);;Все файлы (*)"));
     if (path.isEmpty()) {
         return;
     }
@@ -408,6 +566,7 @@ void MainWindow::onCompareRequested()
         return;
     }
 
+    setBusy(true);
     QMetaObject::invokeMethod(m_worker, "requestCompare", Qt::QueuedConnection,
                               Q_ARG(QByteArray, m_hexEditor->dump()),
                               Q_ARG(QByteArray, *other));
@@ -415,26 +574,39 @@ void MainWindow::onCompareRequested()
 
 void MainWindow::onSaveDumpRequested()
 {
+    if (m_busy) {
+        return;
+    }
     if (!m_hasDump) {
         showError(QStringLiteral("Ошибка"), QStringLiteral("Нет дампа для сохранения"));
         return;
     }
 
-    const QString defaultName = QStringLiteral("%1_dump.bin")
+    const QString defaultName = QStringLiteral("%1_dump.rchip")
                                     .arg(currentProfileId().isEmpty() ? QStringLiteral("chip")
                                                                       : currentProfileId());
-    const QString path = QFileDialog::getSaveFileName(
+    QString path = QFileDialog::getSaveFileName(
         this, QStringLiteral("Сохранить дамп"), defaultName,
-        QStringLiteral("Дампы (*.bin);;Все файлы (*)"));
+        QStringLiteral("Контейнер Resetter (*.rchip);;Сырой бинарный дамп (*.bin);;Все файлы (*)"));
     if (path.isEmpty()) {
         return;
     }
 
-    if (DumpManager::saveDump(path, m_hexEditor->dump(),
-                              m_cartridgePanel->chipId().isEmpty() ? currentProfileId()
-                                                                   : m_cartridgePanel->chipId(),
-                              m_cartridgePanel->cartridgeModel())) {
-        m_logPanel->addMessage(QStringLiteral("Дамп сохранён: %1").arg(path), "success");
+    if (QFileInfo(path).suffix().isEmpty()) {
+        path += QStringLiteral(".rchip");
+    }
+
+    const bool raw = QFileInfo(path).suffix().compare(QStringLiteral("bin"), Qt::CaseInsensitive) == 0;
+    const bool saved = raw
+                           ? DumpManager::saveRawDump(path, m_hexEditor->dump())
+                           : DumpManager::saveDump(path, m_hexEditor->dump(),
+                                                   currentProfileId(),
+                                                   m_cartridgePanel->cartridgeModel());
+    if (saved) {
+        m_logPanel->addMessage(
+            QStringLiteral("Дамп сохранён (%1): %2")
+                .arg(raw ? QStringLiteral("сырой .bin") : QStringLiteral("контейнер .rchip"), path),
+            "success");
     } else {
         showError(QStringLiteral("Ошибка"), QStringLiteral("Не удалось сохранить дамп: %1").arg(path));
     }
@@ -442,9 +614,13 @@ void MainWindow::onSaveDumpRequested()
 
 void MainWindow::onOpenDumpRequested()
 {
+    if (m_busy) {
+        return;
+    }
+
     const QString path = QFileDialog::getOpenFileName(
         this, QStringLiteral("Открыть дамп"), QString(),
-        QStringLiteral("Дампы (*.bin);;Все файлы (*)"));
+        QStringLiteral("Дампы Resetter (*.rchip);;Сырые дампы (*.bin);;Все файлы (*)"));
     if (path.isEmpty()) {
         return;
     }
@@ -455,9 +631,12 @@ void MainWindow::onOpenDumpRequested()
         return;
     }
 
-    applyDump(*data, currentProfileId());
-
     const auto info = DumpManager::dumpInfo(path);
+    const QString preferred = info.has_value() ? info->chipId : QString();
+    selectProfileForDump(*data, preferred);
+
+    applyDump(*data, preferred.isEmpty() ? currentProfileId() : preferred);
+
     if (info.has_value() && !info->cartridgeModel.isEmpty()) {
         m_cartridgePanel->setCartridgeModel(info->cartridgeModel);
     }
@@ -466,6 +645,16 @@ void MainWindow::onOpenDumpRequested()
                                .arg(path)
                                .arg(data->size()),
                            "success");
+
+    if (!dumpMatchesCurrentProfile()) {
+        QMessageBox::warning(
+            this, QStringLiteral("Профиль не совпадает"),
+            QStringLiteral("Размер дампа (%1 байт) не совпадает с профилем %2. "
+                           "Просмотр и редактирование доступны, но запись и проверка отключены. "
+                           "Выберите подходящий профиль чипа.")
+                .arg(data->size())
+                .arg(currentProfileId()));
+    }
 }
 
 void MainWindow::onCancelRequested()
@@ -487,6 +676,16 @@ void MainWindow::onWorkerResult(const ChipOperationResult &result)
 {
     const bool ok = (result.error == ErrorCode::Success);
 
+    if (result.error == ErrorCode::OperationCancelled) {
+        m_logPanel->addMessage(QStringLiteral("Операция отменена"), "warning");
+        m_statusBar->showError(QStringLiteral("Операция отменена"));
+        return;
+    }
+
+    if (!result.backupPath.isEmpty()) {
+        m_logPanel->addMessage(QStringLiteral("Резервная копия: %1").arg(result.backupPath), "info");
+    }
+
     switch (result.type) {
     case ChipOperationType::Connect:
         if (ok) {
@@ -496,12 +695,15 @@ void MainWindow::onWorkerResult(const ChipOperationResult &result)
             m_statusBar->setAdapterState(true);
             m_cartridgePanel->setInfoEnabled(true);
             m_logPanel->addMessage(result.progressText, "success");
+            updateProfileInfo();
             updateTitle();
+            updateActions();
         } else {
             m_connected = false;
             m_connectionPanel->setConnected(false);
             m_connectionPanel->showStatusMessage(QStringLiteral("Статус: ошибка подключения"), false);
             m_statusBar->setAdapterState(false);
+            updateActions();
             showError(QStringLiteral("Ошибка подключения"), result.errorMessage);
         }
         break;
@@ -514,11 +716,22 @@ void MainWindow::onWorkerResult(const ChipOperationResult &result)
         m_cartridgePanel->setInfoEnabled(false);
         m_logPanel->addMessage(result.progressText, "info");
         updateTitle();
+        updateActions();
         break;
 
     case ChipOperationType::Scan:
         if (ok) {
-            m_logPanel->addMessage(result.progressText, result.detectedAddresses.isEmpty() ? "warning" : "success");
+            m_logPanel->addMessage(result.progressText,
+                                   result.detectedAddresses.isEmpty() ? "warning" : "success");
+            if (!result.detectedAddresses.isEmpty()) {
+                QStringList addresses;
+                for (quint8 address : result.detectedAddresses) {
+                    addresses << QStringLiteral("0x%1").arg(address, 2, 16, QLatin1Char('0'));
+                }
+                m_logPanel->addMessage(QStringLiteral("Адреса устройств: %1")
+                                           .arg(addresses.join(QStringLiteral(", "))),
+                                       "info");
+            }
         } else {
             showError(QStringLiteral("Ошибка сканирования"), result.errorMessage);
         }
@@ -527,7 +740,6 @@ void MainWindow::onWorkerResult(const ChipOperationResult &result)
     case ChipOperationType::Read:
         if (ok) {
             applyDump(result.data, currentProfileId());
-            updateChipInfoFromDump(result.data);
             m_logPanel->addMessage(result.progressText, "success");
         } else {
             showError(QStringLiteral("Ошибка чтения"), result.errorMessage);
@@ -536,10 +748,19 @@ void MainWindow::onWorkerResult(const ChipOperationResult &result)
 
     case ChipOperationType::Write:
         if (ok) {
-            m_logPanel->addMessage(result.progressText, "success");
             m_statusBar->setModified(false);
-            QMessageBox::information(this, QStringLiteral("Запись завершена"),
-                                     result.progressText + QStringLiteral("\n\nРекомендуется выполнить проверку записи."));
+            // Сбрасываем базовую линию подсветки: чип теперь содержит этот дамп.
+            m_hexEditor->setDump(m_hexEditor->dump());
+            m_logPanel->addMessage(result.progressText, "success");
+            QMessageBox::information(
+                this, QStringLiteral("Запись завершена"),
+                result.progressText
+                    + QStringLiteral("\n\nДанные записаны и автоматически проверены."));
+        } else if (!result.differences.isEmpty()) {
+            showError(QStringLiteral("Верификация не пройдена"),
+                      QStringLiteral("%1\nПервое различие по адресу 0x%2")
+                          .arg(result.errorMessage)
+                          .arg(result.differences.first(), 4, 16, QLatin1Char('0')));
         } else {
             showError(QStringLiteral("Ошибка записи"), result.errorMessage);
         }
@@ -563,12 +784,12 @@ void MainWindow::onWorkerResult(const ChipOperationResult &result)
     case ChipOperationType::ResetCounter:
         if (ok) {
             applyDump(result.data, currentProfileId());
-            updateChipInfoFromDump(result.data);
             m_logPanel->addMessage(result.progressText, "success");
-            QMessageBox::information(this, QStringLiteral("Счётчик обнулён"),
-                                     result.progressText
-                                         + QStringLiteral("\n\nДамп изменён в памяти. "
-                                                          "Чтобы применить изменения к чипу, нажмите «Записать в чип»."));
+            QMessageBox::information(
+                this, QStringLiteral("Счётчик обнулён"),
+                result.progressText
+                    + QStringLiteral("\n\nДамп изменён в памяти. Чтобы применить изменения "
+                                     "к чипу, нажмите «Записать в чип»."));
         } else {
             showError(QStringLiteral("Ошибка сброса счётчика"), result.errorMessage);
         }
@@ -577,6 +798,8 @@ void MainWindow::onWorkerResult(const ChipOperationResult &result)
     case ChipOperationType::Backup:
         if (ok) {
             m_logPanel->addMessage(result.progressText, "success");
+            QMessageBox::information(this, QStringLiteral("Резервная копия"),
+                                     result.progressText);
         } else {
             showError(QStringLiteral("Ошибка резервного копирования"), result.errorMessage);
         }
@@ -585,8 +808,13 @@ void MainWindow::onWorkerResult(const ChipOperationResult &result)
     case ChipOperationType::Restore:
         if (ok) {
             applyDump(result.data, currentProfileId());
-            updateChipInfoFromDump(result.data);
+            m_statusBar->setModified(true);
             m_logPanel->addMessage(result.progressText, "success");
+            QMessageBox::information(
+                this, QStringLiteral("Копия загружена"),
+                result.progressText
+                    + QStringLiteral("\n\nДанные загружены в редактор, но ещё не записаны в чип. "
+                                     "Проверьте их и нажмите «Записать в чип»."));
         } else {
             showError(QStringLiteral("Ошибка восстановления"), result.errorMessage);
         }
@@ -601,6 +829,8 @@ void MainWindow::onWorkerResult(const ChipOperationResult &result)
         }
         break;
     }
+
+    updateActions();
 }
 
 void MainWindow::onWorkerProgress(int value, const QString &text)
@@ -612,6 +842,7 @@ void MainWindow::onWorkerFinished()
 {
     setBusy(false);
     m_statusBar->setProgress(0, QString());
+    updateActions();
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -636,7 +867,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 void MainWindow::updateChipInfoFromDump(const QByteArray &dump)
 {
     const QString profileId = currentProfileId();
-    auto profile = ProfileManager::instance().profile(profileId);
+    const auto profile = ProfileManager::instance().resolveProfile(profileId);
 
     if (!profile) {
         m_cartridgePanel->updateFromDump(dump, profileId, QString(),
@@ -648,4 +879,3 @@ void MainWindow::updateChipInfoFromDump(const QByteArray &dump)
     m_cartridgePanel->updateFromDump(dump, profile->id, profile->name, profile->sizeBytes,
                                      counter.has_value(), counter.value_or(0));
 }
-

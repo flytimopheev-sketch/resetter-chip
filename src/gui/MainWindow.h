@@ -16,7 +16,7 @@ class StatusBar;
 
 class QThread;
 
-// Главное окно: связывает интерфейс и рабочий поток USB-операций
+// Главное окно: связывает интерфейс и рабочий поток USB/последовательных операций
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -56,11 +56,15 @@ private:
     void setupWorker();
     void loadProfiles();
     void updateTitle();
+    void updateProfileInfo();
+    void updateActions();
 
     void setBusy(bool busy);
     void showError(const QString &title, const QString &message);
     void applyDump(const QByteArray &dump, const QString &chipId);
     void updateChipInfoFromDump(const QByteArray &dump);
+    bool dumpMatchesCurrentProfile() const;
+    void selectProfileForDump(const QByteArray &dump, const QString &preferredProfileId);
 
     QString currentProfileId() const;
     void setDumpAvailable(bool available);
@@ -83,4 +87,3 @@ private:
 };
 
 #endif // MAIN_WINDOW_H
-

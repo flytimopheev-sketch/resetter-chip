@@ -11,9 +11,8 @@
 #include <QStringList>
 #include <QThread>
 
-#include <cstring>
-
 #include <algorithm>
+#include <cstring>
 
 ChipWorker::ChipWorker(QObject *parent)
     : QObject(parent)
@@ -25,6 +24,10 @@ ChipWorker::ChipWorker(QObject *parent)
 ChipWorker::~ChipWorker()
 {
     m_cancelled = true;
+    if (m_adapter) {
+        m_adapter->close();
+        m_adapter.reset();
+    }
 }
 
 void ChipWorker::cancel()
@@ -39,10 +42,10 @@ void ChipWorker::reportProgress(int value, const QString &text)
 
 bool ChipWorker::loadProfile(const QString &profileId, ChipOperationResult &result)
 {
-    auto profile = ProfileManager::instance().profile(profileId);
+    const auto profile = ProfileManager::instance().resolveProfile(profileId);
     if (!profile) {
         result.error = ErrorCode::InvalidProfile;
-        result.errorMessage = QStringLiteral("Профиль чипа «%1» не найден").arg(profileId);
+        result.errorMessage = QStringLiteral("Профиль «%1» не найден или повреждён").arg(profileId);
         return false;
     }
     m_profile = *profile;
@@ -65,7 +68,8 @@ void ChipWorker::applyProfileToAdapter()
     m_adapter->setChipParams(params);
 }
 
-void ChipWorker::requestConnect(const QString &adapterName, quint8 chipAddress, const QString &profileId)
+void ChipWorker::requestConnect(const QString &adapterSpec, int chipAddress,
+                                const QString &profileId)
 {
     ChipOperationResult result;
     result.type = ChipOperationType::Connect;
@@ -77,13 +81,16 @@ void ChipWorker::requestConnect(const QString &adapterName, quint8 chipAddress, 
         return;
     }
 
-    m_chipAddress = chipAddress;
+    m_chipAddress = static_cast<quint8>(chipAddress & 0x7F);
 
-    const AdapterFactory::AdapterType type = AdapterFactory::typeFromString(adapterName);
-    m_adapter = std::shared_ptr<IChipAdapter>(AdapterFactory::createAdapter(type));
+    QString factoryError;
+    m_adapter = std::shared_ptr<IChipAdapter>(
+        AdapterFactory::createAdapter(adapterSpec, &factoryError));
     if (!m_adapter) {
         result.error = ErrorCode::AdapterNotFound;
-        result.errorMessage = QStringLiteral("Неизвестный тип программатора: %1").arg(adapterName);
+        result.errorMessage = factoryError.isEmpty()
+                                  ? QStringLiteral("Неизвестный тип программатора: %1").arg(adapterSpec)
+                                  : factoryError;
         emit operationResult(result);
         emit operationFinished();
         return;
@@ -113,10 +120,9 @@ void ChipWorker::requestConnect(const QString &adapterName, quint8 chipAddress, 
     }
 
     result.progress = 100;
-    result.progressText = QStringLiteral("Программатор подключён, чип %1 отвечает на адресе 0x%2")
-                              .arg(m_profile.id)
-                              .arg(m_chipAddress, 2, 16, QLatin1Char('0'))
-                              .toUpper();
+    result.progressText = QStringLiteral("Подключено: %1; чип %2 отвечает на адресе 0x%3")
+                              .arg(m_adapter->adapterName(), m_profile.id)
+                              .arg(m_chipAddress, 2, 16, QLatin1Char('0'));
     Logger::instance().info(result.progressText);
     emit operationResult(result);
     emit operationFinished();
@@ -140,6 +146,8 @@ void ChipWorker::requestDisconnect()
 
 void ChipWorker::requestScan(const QString &profileId)
 {
+    Q_UNUSED(profileId)
+
     ChipOperationResult result;
     result.type = ChipOperationType::Scan;
     m_cancelled = false;
@@ -152,7 +160,6 @@ void ChipWorker::requestScan(const QString &profileId)
         return;
     }
 
-    Q_UNUSED(profileId)
     const std::vector<uint8_t> detected = m_adapter->scanBus();
     for (uint8_t addrByte : detected) {
         result.detectedAddresses.append(static_cast<quint8>(addrByte));
@@ -166,7 +173,7 @@ void ChipWorker::requestScan(const QString &profileId)
         for (quint8 addr : result.detectedAddresses) {
             list << QStringLiteral("0x%1").arg(addr, 2, 16, QLatin1Char('0'));
         }
-        result.progressText = QStringLiteral("Найдены устройства: ") + list.join(", ").toUpper();
+        result.progressText = QStringLiteral("Найдены устройства: ") + list.join(QStringLiteral(", "));
     }
     Logger::instance().info(result.progressText);
     emit operationResult(result);
@@ -185,6 +192,13 @@ ChipOperationResult ChipWorker::readChip()
     }
 
     const quint32 chipSize = m_profile.sizeBytes;
+    if (chipSize == 0) {
+        result.error = ErrorCode::InvalidProfile;
+        result.errorMessage = errorToString(result.error);
+        return result;
+    }
+
+    // Читаем крупными блоками: адаптер сам делит их на USB/I2C-транзакции.
     const quint32 blockSize = std::max<quint32>(1, m_profile.pageSize) * 8;
 
     QByteArray data;
@@ -208,7 +222,7 @@ ChipOperationResult ChipWorker::readChip()
 
         data.append(reinterpret_cast<const char *>(bytes.data()), static_cast<int>(bytes.size()));
         offset += toRead;
-        reportProgress(static_cast<int>((offset * 100u) / chipSize),
+        reportProgress(static_cast<int>((static_cast<quint64>(offset) * 100u) / chipSize),
                        QStringLiteral("Чтение... %1 из %2 байт").arg(offset).arg(chipSize));
     }
 
@@ -221,10 +235,10 @@ ChipOperationResult ChipWorker::readChip()
 void ChipWorker::requestRead(const QString &profileId)
 {
     ChipOperationResult result;
+    result.type = ChipOperationType::Read;
     m_cancelled = false;
 
     if (!loadProfile(profileId, result)) {
-        result.type = ChipOperationType::Read;
         emit operationResult(result);
         emit operationFinished();
         return;
@@ -240,6 +254,24 @@ void ChipWorker::requestRead(const QString &profileId)
 
     emit operationResult(result);
     emit operationFinished();
+}
+
+bool ChipWorker::saveSafetyBackup(const QByteArray &data, QString *filePath, QString *error)
+{
+    const QString path = DumpManager::backupFileName(
+        QStringLiteral("before_write_%1").arg(m_profile.id));
+    if (!DumpManager::saveDump(path, data, m_profile.id, QString())) {
+        if (error) {
+            *error = QStringLiteral("Не удалось сохранить автоматическую резервную копию: %1").arg(path);
+        }
+        return false;
+    }
+
+    if (filePath) {
+        *filePath = path;
+    }
+    Logger::instance().info(QStringLiteral("Автоматическая резервная копия: ") + path);
+    return true;
 }
 
 void ChipWorker::requestWrite(const QByteArray &data, const QString &profileId)
@@ -264,7 +296,6 @@ void ChipWorker::requestWrite(const QByteArray &data, const QString &profileId)
 
     applyProfileToAdapter();
 
-    // Проверка размера дампа относительно профиля
     QString validationError;
     if (!Validator::validateSize(data, m_profile, &validationError)) {
         result.error = ErrorCode::InvalidChipSize;
@@ -275,25 +306,51 @@ void ChipWorker::requestWrite(const QByteArray &data, const QString &profileId)
     }
 
     // Читаем текущее содержимое чипа: нужно для контроля защищённых зон
+    // и для пропуска неизменённых блоков.
     ChipOperationResult original = readChip();
     if (original.error != ErrorCode::Success) {
         result.error = original.error;
-        result.errorMessage = QStringLiteral("Не удалось прочитать исходный дамп: %1").arg(original.errorMessage);
+        result.errorMessage = QStringLiteral("Не удалось прочитать исходный дамп: %1")
+                                  .arg(original.errorMessage);
         emit operationResult(result);
         emit operationFinished();
         return;
     }
 
-    if (!Validator::validateProtectedRanges(original.data, data, m_profile, &validationError)) {
+    if (!Validator::validateBeforeWrite(original.data, data, m_profile,
+                                        m_profile.allowedRanges, &validationError)) {
         result.error = ErrorCode::ProtectedArea;
-        result.errorMessage = validationError + QStringLiteral(". Запись отменена для защиты критичных данных.");
+        result.errorMessage = validationError
+                              + QStringLiteral(". Запись отменена для защиты критичных данных.");
         emit operationResult(result);
         emit operationFinished();
         return;
     }
+
+    if (DumpManager::compareDumps(original.data, data).isEmpty()) {
+        result.progress = 100;
+        result.progressText = QStringLiteral("Изменений нет — запись в чип не требуется");
+        Logger::instance().info(result.progressText);
+        emit operationResult(result);
+        emit operationFinished();
+        return;
+    }
+
+    // Страховка: перед изменением чипа всегда сохраняем оригинал.
+    QString backupPath;
+    QString backupError;
+    if (!saveSafetyBackup(original.data, &backupPath, &backupError)) {
+        result.error = ErrorCode::FileWriteError;
+        result.errorMessage = backupError;
+        emit operationResult(result);
+        emit operationFinished();
+        return;
+    }
+    result.backupPath = backupPath;
 
     const quint32 chipSize = m_profile.sizeBytes;
     const quint32 blockSize = std::max<quint32>(1, m_profile.pageSize) * 8;
+    bool wroteAny = false;
 
     for (quint32 offset = 0; offset < chipSize; ) {
         if (m_cancelled) {
@@ -314,21 +371,59 @@ void ChipWorker::requestWrite(const QByteArray &data, const QString &profileId)
             std::memcpy(bytes.data(), data.constData() + offset, static_cast<size_t>(chunk));
             if (!m_adapter->write(offset, bytes)) {
                 result.error = ErrorCode::WriteVerificationFailed;
-                result.errorMessage = QString::fromStdString(m_adapter->lastError());
+                result.errorMessage = QStringLiteral("Ошибка записи по адресу 0x%1: %2")
+                                          .arg(offset, 4, 16, QLatin1Char('0'))
+                                          .arg(QString::fromStdString(m_adapter->lastError()));
                 emit operationResult(result);
                 emit operationFinished();
                 return;
             }
+            wroteAny = true;
         }
 
         offset += chunk;
-        reportProgress(static_cast<int>((offset * 100u) / chipSize),
+        reportProgress(static_cast<int>((static_cast<quint64>(offset) * 100u) / chipSize),
                        QStringLiteral("Запись... %1 из %2 байт").arg(offset).arg(chipSize));
     }
 
+    if (!wroteAny) {
+        result.progress = 100;
+        result.progressText = QStringLiteral("Изменений нет — запись в чип не требуется");
+        emit operationResult(result);
+        emit operationFinished();
+        return;
+    }
+
+    // Автоматическая верификация после записи — обязательный шаг.
+    reportProgress(99, QStringLiteral("Проверка записанных данных..."));
+    ChipOperationResult verified = readChip();
+    if (verified.error != ErrorCode::Success) {
+        result.error = verified.error;
+        result.errorMessage = QStringLiteral("Запись выполнена, но проверить чип не удалось: %1")
+                                  .arg(verified.errorMessage);
+        emit operationResult(result);
+        emit operationFinished();
+        return;
+    }
+
+    result.differences = DumpManager::compareDumps(data, verified.data);
     result.progress = 100;
-    result.progressText = QStringLiteral("Запись завершена: %1 байт").arg(chipSize);
-    Logger::instance().info(result.progressText);
+
+    if (!result.differences.isEmpty()) {
+        result.error = ErrorCode::WriteVerificationFailed;
+        result.errorMessage = QStringLiteral("Запись выполнена, но верификация не пройдена: "
+                                             "различий %1, первое по адресу 0x%2")
+                                  .arg(result.differences.size())
+                                  .arg(result.differences.first(), 4, 16, QLatin1Char('0'));
+        Logger::instance().error(result.errorMessage);
+    } else {
+        result.progressText = QStringLiteral("Запись и верификация завершены: %1 байт. "
+                                             "Резервная копия: %2")
+                                  .arg(chipSize)
+                                  .arg(backupPath);
+        Logger::instance().info(result.progressText);
+    }
+
     emit operationResult(result);
     emit operationFinished();
 }
@@ -361,7 +456,9 @@ void ChipWorker::requestVerify(const QByteArray &expected, const QString &profil
         Logger::instance().info(result.progressText);
     } else {
         result.error = ErrorCode::WriteVerificationFailed;
-        result.errorMessage = QStringLiteral("Обнаружено %1 различий").arg(result.differences.size());
+        result.errorMessage = QStringLiteral("Обнаружено различий: %1, первое по адресу 0x%2")
+                                  .arg(result.differences.size())
+                                  .arg(result.differences.first(), 4, 16, QLatin1Char('0'));
         Logger::instance().error(result.errorMessage);
     }
     result.progress = 100;
@@ -381,10 +478,20 @@ void ChipWorker::requestResetCounter(const QByteArray &data, const QString &prof
         return;
     }
 
+    QString validationError;
+    if (!Validator::validateSize(data, m_profile, &validationError)) {
+        result.error = ErrorCode::InvalidChipSize;
+        result.errorMessage = validationError;
+        emit operationResult(result);
+        emit operationFinished();
+        return;
+    }
+
     const auto modified = CounterReset::resetCounter(data, m_profile);
     if (!modified.has_value()) {
         result.error = ErrorCode::InvalidProfile;
-        result.errorMessage = QStringLiteral("В профиле «%1» не задано смещение счётчика").arg(m_profile.id);
+        result.errorMessage = QStringLiteral("В профиле «%1» не задано корректное смещение счётчика")
+                                  .arg(m_profile.id);
         emit operationResult(result);
         emit operationFinished();
         return;
@@ -400,7 +507,8 @@ void ChipWorker::requestResetCounter(const QByteArray &data, const QString &prof
     emit operationFinished();
 }
 
-void ChipWorker::requestBackup(const QByteArray &data, const QString &chipId, const QString &cartridgeModel)
+void ChipWorker::requestBackup(const QByteArray &data, const QString &chipId,
+                               const QString &cartridgeModel)
 {
     ChipOperationResult result;
     result.type = ChipOperationType::Backup;
@@ -413,16 +521,8 @@ void ChipWorker::requestBackup(const QByteArray &data, const QString &chipId, co
         return;
     }
 
-    const QString backupDir = DumpManager::backupDirectory();
-    if (!QDir().mkpath(backupDir)) {
-        result.error = ErrorCode::FileWriteError;
-        result.errorMessage = QStringLiteral("Не удалось создать каталог резервных копий: %1").arg(backupDir);
-        emit operationResult(result);
-        emit operationFinished();
-        return;
-    }
-
-    const QString filePath = DumpManager::backupFileName(QStringLiteral("backup"));
+    const QString filePath = DumpManager::backupFileName(
+        QStringLiteral("manual_%1").arg(chipId.isEmpty() ? QStringLiteral("chip") : chipId));
     if (!DumpManager::saveDump(filePath, data, chipId, cartridgeModel)) {
         result.error = ErrorCode::FileWriteError;
         result.errorMessage = QStringLiteral("Не удалось сохранить резервную копию: %1").arg(filePath);
@@ -431,6 +531,7 @@ void ChipWorker::requestBackup(const QByteArray &data, const QString &chipId, co
         return;
     }
 
+    result.backupPath = filePath;
     result.progress = 100;
     result.progressText = QStringLiteral("Резервная копия сохранена: %1").arg(filePath);
     Logger::instance().info(result.progressText);
@@ -453,16 +554,19 @@ void ChipWorker::requestRestore(const QString &backupPath, const QString &profil
     }
 
     if (!profileId.isEmpty()) {
-        ChipOperationResult tmp;
-        if (loadProfile(profileId, tmp)) {
-            QString validationError;
-            if (!Validator::validateSize(*data, m_profile, &validationError)) {
-                result.error = ErrorCode::InvalidChipSize;
-                result.errorMessage = validationError;
-                emit operationResult(result);
-                emit operationFinished();
-                return;
-            }
+        if (!loadProfile(profileId, result)) {
+            emit operationResult(result);
+            emit operationFinished();
+            return;
+        }
+
+        QString validationError;
+        if (!Validator::validateSize(*data, m_profile, &validationError)) {
+            result.error = ErrorCode::InvalidChipSize;
+            result.errorMessage = validationError;
+            emit operationResult(result);
+            emit operationFinished();
+            return;
         }
     }
 
@@ -491,4 +595,3 @@ void ChipWorker::requestCompare(const QByteArray &a, const QByteArray &b)
     emit operationResult(result);
     emit operationFinished();
 }
-
