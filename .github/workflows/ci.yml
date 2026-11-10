@@ -73,13 +73,15 @@ jobs:
           echo "Версия: ${VERSION}"
           # Версия в spec должна совпадать с версией исходников из CMake.
           sed -i "s/^Version:.*/Version:        ${VERSION}/" packaging/resetter-chip.spec
-          mkdir -p "/opt/pkg/resetter-chip-${VERSION}" /root/rpmbuild/SOURCES dist
+          # rpmbuild в контейнере использует $HOME/rpmbuild, а не /root/rpmbuild.
+          TOPDIR="$HOME/rpmbuild"
+          mkdir -p "/opt/pkg/resetter-chip-${VERSION}" "${TOPDIR}/SOURCES" dist
           cp -r src tests packaging CMakeLists.txt README.md CHANGELOG.md LICENSE \
                 "/opt/pkg/resetter-chip-${VERSION}/"
-          tar czf "/root/rpmbuild/SOURCES/resetter-chip-${VERSION}.tar.gz" \
+          tar czf "${TOPDIR}/SOURCES/resetter-chip-${VERSION}.tar.gz" \
                 -C /opt/pkg "resetter-chip-${VERSION}"
-          rpmbuild -ba packaging/resetter-chip.spec
-          cp /root/rpmbuild/RPMS/*/*.rpm dist/
+          rpmbuild --define "_topdir ${TOPDIR}" -ba packaging/resetter-chip.spec
+          cp "${TOPDIR}"/RPMS/*/*.rpm dist/
 
       - name: Загрузка RPM как артефакта
         uses: actions/upload-artifact@v4
