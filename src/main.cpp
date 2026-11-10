@@ -8,7 +8,7 @@
 
 // Версия определяется CMake (project VERSION); значение ниже — запасное для IDE
 #ifndef RESETTER_CHIP_VERSION
-#define RESETTER_CHIP_VERSION "1.0.0"
+#define RESETTER_CHIP_VERSION "1.1.0"
 #endif
 
 int main(int argc, char *argv[])

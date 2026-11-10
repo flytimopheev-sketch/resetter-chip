@@ -1,5 +1,5 @@
 Name:           Resetter-chip
-Version:        1.0.0
+Version:        1.1.0
 Release:        1%{?dist}
 Summary:        Сброс счётчиков чипов картриджей (CH341A, I2C, самодельные программаторы)
 
@@ -50,5 +50,9 @@ install -pm 0644 LICENSE %{buildroot}%{_licensedir}/%{name}/LICENSE
 /usr/lib/udev/rules.d/99-ch341a.rules
 
 %changelog
+* Tue Nov 10 2026 Resetter Chip contributors <flytimopheev-sketch@users.noreply.github.com> - 1.1.0-1
+- Поддержка самодельного последовательного программатора, профили картриджей,
+  безопасная запись с резервным копированием и верификацией, исправления CH341A.
+
 * Mon Nov 09 2026 Resetter Chip contributors <flytimopheev-sketch@users.noreply.github.com> - 1.0.0-1
 - Первый публичный выпуск: чтение, сброс счётчика, запись и верификация EEPROM 24Cxx

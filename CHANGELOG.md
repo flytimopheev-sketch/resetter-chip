@@ -7,6 +7,8 @@
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-11-10
+
 ### Добавлено
 
 - Поддержка самодельного последовательного программатора на Arduino/ESP:
@@ -64,5 +66,6 @@
 - Отмена длительных операций и таймауты обмена с программатором.
 - Санитайзинг аргументов и отказ от небезопасных конструкций при работе с файлами.
 
-[Unreleased]: https://github.com/flytimopheev-sketch/resetter-chip/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/flytimopheev-sketch/resetter-chip/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/flytimopheev-sketch/resetter-chip/releases/tag/v1.1.0
 [1.0.0]: https://github.com/flytimopheev-sketch/resetter-chip/releases/tag/v1.0.0

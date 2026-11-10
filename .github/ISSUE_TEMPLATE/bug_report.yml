@@ -24,7 +24,7 @@ body:
     attributes:
       label: Версия Resetter Chip
       description: Вывод команды `Resetter-chip --version` или версия из RPM
-      placeholder: "1.0.0"
+      placeholder: "1.1.0"
     validations:
       required: true
 

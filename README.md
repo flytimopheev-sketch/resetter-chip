@@ -102,7 +102,7 @@ SDA/SCL подтягиваются к питанию резисторами 4.7 
 и установите его:
 
 ```bash
-sudo dnf install ./Resetter-chip-1.0.0-1.*.x86_64.rpm
+sudo dnf install ./Resetter-chip-1.1.0-1.*.x86_64.rpm
 ```
 
 Для доступа к CH341A без `root` установите udev-правило (оно входит в пакет):
