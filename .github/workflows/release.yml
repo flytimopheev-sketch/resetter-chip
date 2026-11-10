@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Тег релиза (например, v1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Сборка RPM и публикация
+    runs-on: ubuntu-latest
+    container: fedora:40
+    steps:
+      - name: Установка git и gh
+        run: dnf -y install git gh && dnf clean all
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Доверие рабочему каталогу git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Зависимости сборки
+        run: >
+          dnf -y install
+          cmake gcc-c++ make pkgconf-pkg-config
+          qt6-qtbase-devel libusb1-devel
+          rpm-build redhat-rpm-config tar gzip
+          && dnf clean all
+
+      - name: Сборка и тесты
+        run: |
+          set -euo pipefail
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build build -j"$(nproc)"
+          ctest --test-dir build --output-on-failure
+
+      - name: Сборка RPM
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "Версия релиза: ${VERSION}"
+          sed -i "s/^Version:.*/Version:        ${VERSION}/" packaging/resetter-chip.spec
+          sed -i "s/^project(Resetter-chip VERSION [0-9.]*)/project(Resetter-chip VERSION ${VERSION}/" CMakeLists.txt
+
+          TOPDIR="${{ github.workspace }}/rpmbuild"
+          mkdir -p "${TOPDIR}/SOURCES" "${TOPDIR}/SPECS" "${TOPDIR}/BUILD" "${TOPDIR}/RPMS" "${TOPDIR}/SRPMS" dist
+          SRCROOT="/tmp/resetter-chip-${VERSION}"
+          rm -rf "${SRCROOT}"
+          mkdir -p "${SRCROOT}"
+          cp -r src tests packaging CMakeLists.txt README.md CHANGELOG.md LICENSE "${SRCROOT}/"
+          tar czf "${TOPDIR}/SOURCES/resetter-chip-${VERSION}.tar.gz" \
+                -C /tmp "resetter-chip-${VERSION}"
+          rm -rf "${SRCROOT}"
+
+          rpmbuild --define "_topdir ${TOPDIR}" -ba packaging/resetter-chip.spec
+          shopt -s globstar nullglob
+          cp "${TOPDIR}/RPMS"/**/*.rpm dist/
+          ls -l dist
+
+      - name: Публикация релиза и вложение RPM
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --title "Resetter Chip ${TAG}" \
+              --notes "См. [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)."
+          fi
+          gh release upload "$TAG" dist/*.rpm --clobber
