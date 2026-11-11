@@ -98,12 +98,24 @@ SDA/SCL подтягиваются к питанию резисторами 4.7 
 
 ### Готовый RPM-пакет
 
-Скачайте пакет из [последнего релиза](https://github.com/flytimopheev-sketch/resetter-chip/releases/latest)
-и установите его:
+В релизе отдельные пакеты для Fedora 40 и RED OS 7.3: они собраны с разными
+версиями Qt и glibc.
+
+**Fedora 40** (Qt 6.8, glibc 2.39):
 
 ```bash
-sudo dnf install ./Resetter-chip-1.1.0-1.*.x86_64.rpm
+sudo dnf install ./Resetter-chip-1.1.0-1.fc40.x86_64.rpm
 ```
+
+**RED OS 7.3** (Qt 6.6, glibc 2.28):
+
+```bash
+sudo dnf install ./Resetter-chip-1.1.0-1.redos7.x86_64.rpm
+```
+
+Пакет `fc40` на RED OS не установится: ему нужны Qt 6.8 и glibc 2.39.
+Пакет `redos7` собран внутри RED OS 7.3 и использует системные Qt 6.6
+и libusbx. Подробнее о сборке — в [`docs/BUILD_REDOS.md`](docs/BUILD_REDOS.md).
 
 Для доступа к CH341A без `root` установите udev-правило (оно входит в пакет):
 

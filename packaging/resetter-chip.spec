@@ -8,13 +8,13 @@ URL:            https://github.com/flytimopheev-sketch/resetter-chip
 Source0:        resetter-chip-%{version}.tar.gz
 
 BuildRequires:  qt6-qtbase-devel >= 6.2
-BuildRequires:  libusb1-devel
+# libusb1-devel в Fedora, libusbx-devel в RED OS; оба предоставляют pkgconfig.
+BuildRequires:  pkgconfig(libusb-1.0)
 BuildRequires:  cmake >= 3.16
 BuildRequires:  gcc-c++
 BuildRequires:  pkgconf-pkg-config
 
 Requires:       qt6-qtbase
-Requires:       libusb1
 
 %description
 Графическое приложение на C++/Qt 6 для работы с чипами картриджей лазерных
