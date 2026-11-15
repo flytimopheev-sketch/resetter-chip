@@ -197,6 +197,7 @@ void HexEditor::rebuildText()
 bool HexEditor::parseText(const QString &text, QByteArray &out) const
 {
     out.clear();
+    uint expectedOffset = 0;
     const QStringList lines = text.split(QLatin1Char('\n'));
 
     for (const QString &line : lines) {
@@ -237,24 +238,34 @@ bool HexEditor::parseText(const QString &text, QByteArray &out) const
         }
 
         if (bytes.isEmpty()) {
-            continue;
-        }
-
-        // Размер дампа менять нельзя: адрес и данные должны попадать
-        // в уже загруженный буфер.
-        if (offset + static_cast<uint>(bytes.size()) > static_cast<uint>(m_currentData.size())) {
             return false;
         }
 
-        if (out.size() < static_cast<int>(offset) + bytes.size()) {
-            out.resize(static_cast<int>(offset) + bytes.size());
+        // Строки должны идти подряд без пропусков: удаление строки или
+        // hex-токена не должно молча занулять байты дампа.
+        if (offset != expectedOffset) {
+            return false;
+        }
+        const uint lineEnd = offset + static_cast<uint>(bytes.size());
+        // Неполная строка (меньше 16 байт) допустима только в самом конце.
+        if (bytes.size() != 16 && lineEnd != static_cast<uint>(m_currentData.size())) {
+            return false;
+        }
+        if (lineEnd > static_cast<uint>(m_currentData.size())) {
+            return false;
+        }
+
+        if (out.size() < static_cast<int>(lineEnd)) {
+            out.resize(static_cast<int>(lineEnd));
         }
         for (int i = 0; i < bytes.size(); ++i) {
             out[static_cast<int>(offset) + i] = bytes.at(i);
         }
+        expectedOffset = lineEnd;
     }
 
-    return true;
+    // Все строки дампа должны присутствовать.
+    return expectedOffset == static_cast<uint>(m_currentData.size());
 }
 
 void HexEditor::onTextChanged()

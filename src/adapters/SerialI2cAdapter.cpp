@@ -162,9 +162,19 @@ bool SerialI2cAdapter::open()
     m_portName = port;
 
     // Проверяем, что на другой стороне прошивка Resetter, а не случайное устройство.
-    QByteArray response;
-    if (!sendRequestUnlocked(SerialProtocol::Command::Ping, 0, 0, 0, {}, response)
-        || !QString::fromLatin1(response).startsWith(QStringLiteral("RESETTER"))) {
+    // Arduino Uno/Nano сбрасываются по DTR при открытии порта и ~1–2 с проводят
+    // в загрузчике, который «съедает» первый запрос, — повторяем Ping.
+    bool pingOk = false;
+    for (int attempt = 0; attempt < 3 && !pingOk; ++attempt) {
+        if (attempt > 0) {
+            QThread::msleep(1500);
+            tcflush(m_fd, TCIFLUSH);
+        }
+        QByteArray response;
+        pingOk = sendRequestUnlocked(SerialProtocol::Command::Ping, 0, 0, 0, {}, response)
+                 && QString::fromLatin1(response).startsWith(QStringLiteral("RESETTER"));
+    }
+    if (!pingOk) {
         closeUnlocked();
         if (m_lastError.empty()) {
             setError("Последовательный порт открыт, но прошивка Resetter не ответила на PING");

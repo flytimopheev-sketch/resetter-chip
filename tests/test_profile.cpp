@@ -69,6 +69,21 @@ private slots:
         QVERIFY(p.isAddressProtected(0x0F, 4));
     }
 
+    void counterEndianParsing()
+    {
+        QJsonObject obj;
+        obj[QStringLiteral("id")] = QStringLiteral("BE");
+        obj[QStringLiteral("name")] = QStringLiteral("BE chip");
+        obj[QStringLiteral("size_bytes")] = 256;
+        obj[QStringLiteral("counter_offset")] = 0;
+        obj[QStringLiteral("counter_size")] = 2;
+        obj[QStringLiteral("counter_endian")] = QStringLiteral("big");
+        obj[QStringLiteral("counter_initial_value")] = 255;
+        const ChipProfile p = ChipProfile::fromJson(obj);
+        QCOMPARE(p.counterBigEndian, true);
+        QCOMPARE(p.counterInitialValue, static_cast<quint32>(255));
+    }
+
     void loadsBundledProfiles()
     {
         const QString dir = QStringLiteral(RC_PROFILES_DIR);
@@ -101,6 +116,9 @@ private slots:
         QCOMPARE(resolved->counterOffset, static_cast<quint32>(255));
         QCOMPARE(resolved->counterSize, static_cast<quint32>(2));
         QCOMPARE(resolved->allowedRanges.size(), 1);
+        // Зоны чипа и картриджа совпадают — после объединения и дедупликации их 2.
+        QCOMPARE(resolved->protectedRanges.size(), 2);
+        QCOMPARE(resolved->counterInitialValue, static_cast<quint32>(0));
 
         // Счётчик не должен выходить за границу 1024-байтного 24C08.
         const auto samsung = pm.resolveProfile(QStringLiteral("Samsung_MLT_D101S"));

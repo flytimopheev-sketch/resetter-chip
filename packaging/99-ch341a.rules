@@ -1,6 +1,9 @@
-# udev-правило для CH341A USB-UART/I2C программатора
-# Позволяет обычному пользователю получать доступ к устройству без root
-SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="5512", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="5523", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="5535", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="5572", MODE="0666", GROUP="plugdev"
+# udev-правило для CH341A USB-UART/I2C программатора.
+# TAG+="uaccess" выдаёт доступ активному локальному пользователю (systemd-logind)
+# без всеобщего режима 0666 и без зависимости от группы plugdev.
+SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="5512", MODE="0660", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="5523", MODE="0660", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="5535", MODE="0660", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="5572", MODE="0660", TAG+="uaccess"
+# Для CH341A-совместимых плат с другим VID/PID добавьте строку по образцу:
+# SUBSYSTEM=="usb", ATTR{idVendor}=="XXXX", ATTR{idProduct}=="YYYY", MODE="0660", TAG+="uaccess"

@@ -20,7 +20,8 @@ CartridgePanel::CartridgePanel(QWidget *parent)
     addRow(2, QStringLiteral("Тип чипа:"), m_chipTypeLabel);
     addRow(3, QStringLiteral("Объём памяти:"), m_memorySizeLabel);
     addRow(4, QStringLiteral("Счётчик страниц:"), m_pageCounterLabel);
-    addRow(5, QStringLiteral("Статус чипа:"), m_chipStatusLabel);
+    addRow(5, QStringLiteral("Ресурс картриджа:"), m_pageResourceLabel);
+    addRow(6, QStringLiteral("Статус чипа:"), m_chipStatusLabel);
 
     layout->setColumnStretch(1, 1);
 
@@ -32,7 +33,8 @@ void CartridgePanel::setInfoEnabled(bool enabled)
 {
     // Панель всегда видима, меняется только доступность
     for (QLabel *label : {m_printerModelLabel, m_cartridgeModelLabel, m_chipTypeLabel,
-                          m_memorySizeLabel, m_pageCounterLabel, m_chipStatusLabel}) {
+                          m_memorySizeLabel, m_pageCounterLabel, m_pageResourceLabel,
+                          m_chipStatusLabel}) {
         label->setEnabled(enabled);
     }
 
@@ -42,6 +44,7 @@ void CartridgePanel::setInfoEnabled(bool enabled)
         m_chipTypeLabel->setText(m_chipId.isEmpty() ? QStringLiteral("—") : m_chipId);
         m_memorySizeLabel->setText(QStringLiteral("—"));
         m_pageCounterLabel->setText(QStringLiteral("—"));
+        m_pageResourceLabel->setText(QStringLiteral("—"));
         m_chipStatusLabel->setText(QStringLiteral("Неизвестно"));
         m_chipStatusLabel->setStyleSheet(QString());
     }
@@ -78,6 +81,12 @@ void CartridgePanel::setCartridgeModel(const QString &model)
 {
     m_cartridgeModel = model;
     m_cartridgeModelLabel->setText(model.isEmpty() ? QStringLiteral("—") : model);
+}
+
+void CartridgePanel::setPageResource(quint32 pages)
+{
+    m_pageResourceLabel->setText(pages > 0 ? QStringLiteral("%1 страниц").arg(pages)
+                                           : QStringLiteral("—"));
 }
 
 QString CartridgePanel::chipId() const

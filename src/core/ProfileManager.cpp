@@ -11,6 +11,8 @@
 #include <QJsonObject>
 #include <QStandardPaths>
 
+#include <algorithm>
+
 namespace {
 constexpr quint32 kCounterUnset = 0xFFFFFFFFu;
 
@@ -225,13 +227,25 @@ std::shared_ptr<ChipProfile> ProfileManager::resolveProfile(const QString &id) c
     if (cartridge->counterSize != 0) {
         resolved->counterSize = cartridge->counterSize;
     }
-
-    if (!cartridge->protectedRanges.isEmpty()) {
-        resolved->protectedRanges.clear();
-        for (const CartridgeRange &range : cartridge->protectedRanges) {
-            resolved->protectedRanges.append(qMakePair(range.start, range.end));
-        }
+    if (cartridge->hasCounterInitialValue) {
+        resolved->counterInitialValue = cartridge->counterInitialValue;
     }
+    if (!cartridge->counterEndian.isEmpty()) {
+        resolved->counterBigEndian = (cartridge->counterEndian == QStringLiteral("big"));
+    }
+
+    // Защищённые зоны картриджа ДОПОЛНЯЮТ зоны чипа, а не заменяют их:
+    // защита базового профиля не должна теряться.
+    for (const CartridgeRange &range : cartridge->protectedRanges) {
+        resolved->protectedRanges.append(qMakePair(range.start, range.end));
+    }
+    std::sort(resolved->protectedRanges.begin(), resolved->protectedRanges.end(),
+              [](const QPair<quint32, quint32> &a, const QPair<quint32, quint32> &b) {
+                  return a.first < b.first;
+              });
+    resolved->protectedRanges.erase(
+        std::unique(resolved->protectedRanges.begin(), resolved->protectedRanges.end()),
+        resolved->protectedRanges.end());
 
     if (!cartridge->allowedModifyRanges.isEmpty()) {
         resolved->allowedRanges.clear();

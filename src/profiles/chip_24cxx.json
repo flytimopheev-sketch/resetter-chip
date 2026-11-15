@@ -149,7 +149,7 @@
     "i2c_address": 80,
     "two_byte_address": true,
     "block_bits": 1,
-    "page_size": 256,
+    "page_size": 128,
     "write_cycle_ms": 5,
     "family": "24Cxx",
     "counter_offset": 4294967295,

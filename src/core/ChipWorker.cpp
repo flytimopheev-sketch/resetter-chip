@@ -35,6 +35,11 @@ void ChipWorker::cancel()
     m_cancelled = true;
 }
 
+void ChipWorker::resetCancelled()
+{
+    m_cancelled = false;
+}
+
 void ChipWorker::reportProgress(int value, const QString &text)
 {
     emit operationProgress(std::clamp(value, 0, 100), text);
@@ -73,7 +78,6 @@ void ChipWorker::requestConnect(const QString &adapterSpec, int chipAddress,
 {
     ChipOperationResult result;
     result.type = ChipOperationType::Connect;
-    m_cancelled = false;
 
     if (!loadProfile(profileId, result)) {
         emit operationResult(result);
@@ -150,7 +154,6 @@ void ChipWorker::requestScan(const QString &profileId)
 
     ChipOperationResult result;
     result.type = ChipOperationType::Scan;
-    m_cancelled = false;
 
     if (!m_adapter || !m_adapter->isOpen()) {
         result.error = ErrorCode::AdapterNotOpened;
@@ -236,7 +239,6 @@ void ChipWorker::requestRead(const QString &profileId)
 {
     ChipOperationResult result;
     result.type = ChipOperationType::Read;
-    m_cancelled = false;
 
     if (!loadProfile(profileId, result)) {
         emit operationResult(result);
@@ -278,7 +280,6 @@ void ChipWorker::requestWrite(const QByteArray &data, const QString &profileId)
 {
     ChipOperationResult result;
     result.type = ChipOperationType::Write;
-    m_cancelled = false;
 
     if (!loadProfile(profileId, result)) {
         emit operationResult(result);
@@ -370,7 +371,7 @@ void ChipWorker::requestWrite(const QByteArray &data, const QString &profileId)
             std::vector<uint8_t> bytes(static_cast<size_t>(chunk));
             std::memcpy(bytes.data(), data.constData() + offset, static_cast<size_t>(chunk));
             if (!m_adapter->write(offset, bytes)) {
-                result.error = ErrorCode::WriteVerificationFailed;
+                result.error = ErrorCode::WriteFailed;
                 result.errorMessage = QStringLiteral("Ошибка записи по адресу 0x%1: %2")
                                           .arg(offset, 4, 16, QLatin1Char('0'))
                                           .arg(QString::fromStdString(m_adapter->lastError()));
@@ -432,7 +433,6 @@ void ChipWorker::requestVerify(const QByteArray &expected, const QString &profil
 {
     ChipOperationResult result;
     result.type = ChipOperationType::Verify;
-    m_cancelled = false;
 
     if (!loadProfile(profileId, result)) {
         emit operationResult(result);
@@ -470,7 +470,6 @@ void ChipWorker::requestResetCounter(const QByteArray &data, const QString &prof
 {
     ChipOperationResult result;
     result.type = ChipOperationType::ResetCounter;
-    m_cancelled = false;
 
     if (!loadProfile(profileId, result)) {
         emit operationResult(result);
@@ -499,7 +498,8 @@ void ChipWorker::requestResetCounter(const QByteArray &data, const QString &prof
 
     result.data = *modified;
     result.progress = 100;
-    result.progressText = QStringLiteral("Счётчик страниц обнулён в дампе (смещение 0x%1, размер %2 байт)")
+    result.progressText = QStringLiteral("Счётчик страниц сброшен в %1 (смещение 0x%2, размер %3 байт)")
+                              .arg(m_profile.counterInitialValue)
                               .arg(m_profile.counterOffset, 4, 16, QLatin1Char('0'))
                               .arg(m_profile.counterSize);
     Logger::instance().info(result.progressText);

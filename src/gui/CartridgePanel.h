@@ -23,6 +23,7 @@ public:
 
     void setChipId(const QString &chipId);
     void setCartridgeModel(const QString &model);
+    void setPageResource(quint32 pages);
 
     QString chipId() const;
     QString cartridgeModel() const;
@@ -33,6 +34,7 @@ private:
     QLabel *m_chipTypeLabel = nullptr;
     QLabel *m_memorySizeLabel = nullptr;
     QLabel *m_pageCounterLabel = nullptr;
+    QLabel *m_pageResourceLabel = nullptr;
     QLabel *m_chipStatusLabel = nullptr;
 
     QString m_chipId;

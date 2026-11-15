@@ -57,6 +57,9 @@ public:
     void cancel();
 
 public slots:
+    // Сброс флага отмены. Вызывается через очередь ПЕРЕД каждой операцией,
+    // чтобы отмена не терялась из-за гонки со стартом слота.
+    void resetCancelled();
     void requestConnect(const QString &adapterSpec, int chipAddress, const QString &profileId);
     void requestDisconnect();
     void requestScan(const QString &profileId);

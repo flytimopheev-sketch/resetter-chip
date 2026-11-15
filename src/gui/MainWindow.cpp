@@ -217,9 +217,11 @@ void MainWindow::updateProfileInfo()
         }
         m_cartridgePanel->setCartridgeModel(model);
         m_cartridgePanel->setChipId(cartridge->chipProfileId);
+        m_cartridgePanel->setPageResource(cartridge->pageResource);
     } else {
         m_cartridgePanel->setCartridgeModel(QString());
         m_cartridgePanel->setChipId(m_profileId);
+        m_cartridgePanel->setPageResource(0);
     }
 
     const auto resolved = manager.resolveProfile(m_profileId);
@@ -374,6 +376,7 @@ void MainWindow::onConnectRequested()
                                .arg(adapterSpec, profileId)
                                .arg(m_connectionPanel->chipAddress(), 2, 16, QLatin1Char('0')));
 
+    QMetaObject::invokeMethod(m_worker, "resetCancelled", Qt::QueuedConnection);
     QMetaObject::invokeMethod(m_worker, "requestConnect", Qt::QueuedConnection,
                               Q_ARG(QString, adapterSpec),
                               Q_ARG(int, static_cast<int>(m_connectionPanel->chipAddress())),
@@ -396,6 +399,7 @@ void MainWindow::onScanRequested()
     }
     setBusy(true);
     m_logPanel->addMessage(QStringLiteral("Сканирование шины I2C..."));
+    QMetaObject::invokeMethod(m_worker, "resetCancelled", Qt::QueuedConnection);
     QMetaObject::invokeMethod(m_worker, "requestScan", Qt::QueuedConnection,
                               Q_ARG(QString, currentProfileId()));
 }
@@ -413,6 +417,7 @@ void MainWindow::onReadRequested()
     m_statusBar->setProgress(0, QStringLiteral("Чтение чипа..."));
     m_logPanel->addMessage(QStringLiteral("Чтение чипа %1...").arg(currentProfileId()));
 
+    QMetaObject::invokeMethod(m_worker, "resetCancelled", Qt::QueuedConnection);
     QMetaObject::invokeMethod(m_worker, "requestRead", Qt::QueuedConnection,
                               Q_ARG(QString, currentProfileId()));
 }
@@ -455,6 +460,7 @@ void MainWindow::onWriteRequested()
     m_statusBar->setProgress(0, QStringLiteral("Запись в чип..."));
     m_logPanel->addMessage(QStringLiteral("Запись в чип %1...").arg(currentProfileId()));
 
+    QMetaObject::invokeMethod(m_worker, "resetCancelled", Qt::QueuedConnection);
     QMetaObject::invokeMethod(m_worker, "requestWrite", Qt::QueuedConnection,
                               Q_ARG(QByteArray, data),
                               Q_ARG(QString, currentProfileId()));
@@ -475,6 +481,7 @@ void MainWindow::onVerifyRequested()
     m_statusBar->setProgress(0, QStringLiteral("Проверка записи..."));
     m_logPanel->addMessage(QStringLiteral("Верификация содержимого чипа..."));
 
+    QMetaObject::invokeMethod(m_worker, "resetCancelled", Qt::QueuedConnection);
     QMetaObject::invokeMethod(m_worker, "requestVerify", Qt::QueuedConnection,
                               Q_ARG(QByteArray, m_hexEditor->dump()),
                               Q_ARG(QString, currentProfileId()));
@@ -500,6 +507,7 @@ void MainWindow::onResetCounterRequested()
 
     setBusy(true);
     m_logPanel->addMessage(QStringLiteral("Обнуление счётчика %1...").arg(currentProfileId()));
+    QMetaObject::invokeMethod(m_worker, "resetCancelled", Qt::QueuedConnection);
     QMetaObject::invokeMethod(m_worker, "requestResetCounter", Qt::QueuedConnection,
                               Q_ARG(QByteArray, m_hexEditor->dump()),
                               Q_ARG(QString, currentProfileId()));
@@ -676,14 +684,19 @@ void MainWindow::onWorkerResult(const ChipOperationResult &result)
 {
     const bool ok = (result.error == ErrorCode::Success);
 
-    if (result.error == ErrorCode::OperationCancelled) {
-        m_logPanel->addMessage(QStringLiteral("Операция отменена"), "warning");
-        m_statusBar->showError(QStringLiteral("Операция отменена"));
-        return;
-    }
-
     if (!result.backupPath.isEmpty()) {
         m_logPanel->addMessage(QStringLiteral("Резервная копия: %1").arg(result.backupPath), "info");
+    }
+
+    if (result.error == ErrorCode::OperationCancelled) {
+        m_logPanel->addMessage(QStringLiteral("Операция отменена"), "warning");
+        if (result.type == ChipOperationType::Write && !result.backupPath.isEmpty()) {
+            m_logPanel->addMessage(QStringLiteral("Запись могла быть прервана на середине. "
+                                                  "Исходное содержимое чипа сохранено: %1")
+                                       .arg(result.backupPath), "warning");
+        }
+        m_statusBar->showError(QStringLiteral("Операция отменена"));
+        return;
     }
 
     switch (result.type) {
@@ -786,7 +799,7 @@ void MainWindow::onWorkerResult(const ChipOperationResult &result)
             applyDump(result.data, currentProfileId());
             m_logPanel->addMessage(result.progressText, "success");
             QMessageBox::information(
-                this, QStringLiteral("Счётчик обнулён"),
+                this, QStringLiteral("Счётчик сброшен"),
                 result.progressText
                     + QStringLiteral("\n\nДамп изменён в памяти. Чтобы применить изменения "
                                      "к чипу, нажмите «Записать в чип»."));

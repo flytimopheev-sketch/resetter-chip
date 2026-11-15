@@ -95,6 +95,10 @@ CartridgeProfile CartridgeProfile::fromJson(const QJsonObject &obj)
     if (obj.contains(QStringLiteral("counter_initial_value"))) {
         p.counterInitialValue = static_cast<quint32>(
             qMax<qint64>(0, obj.value(QStringLiteral("counter_initial_value")).toInteger(0)));
+        p.hasCounterInitialValue = true;
+    }
+    if (obj.contains(QStringLiteral("counter_endian"))) {
+        p.counterEndian = obj.value(QStringLiteral("counter_endian")).toString().trimmed().toLower();
     }
     if (obj.contains(QStringLiteral("page_resource"))) {
         p.pageResource = static_cast<quint32>(
@@ -129,6 +133,9 @@ QJsonObject CartridgeProfile::toJson() const
     obj[QStringLiteral("counter_offset")] = static_cast<qint64>(counterOffset);
     obj[QStringLiteral("counter_size")] = static_cast<qint64>(counterSize);
     obj[QStringLiteral("counter_initial_value")] = static_cast<qint64>(counterInitialValue);
+    if (!counterEndian.isEmpty()) {
+        obj[QStringLiteral("counter_endian")] = counterEndian;
+    }
     obj[QStringLiteral("page_resource")] = static_cast<qint64>(pageResource);
     obj[QStringLiteral("protected_ranges")] = rangesToJson(protectedRanges);
     obj[QStringLiteral("allowed_modify_ranges")] = rangesToJson(allowedModifyRanges);
@@ -141,6 +148,11 @@ bool CartridgeProfile::isValid() const
         return false;
     }
     if (counterSize != 0 && counterSize != 1 && counterSize != 2 && counterSize != 4) {
+        return false;
+    }
+    if (!counterEndian.isEmpty()
+        && counterEndian != QStringLiteral("little")
+        && counterEndian != QStringLiteral("big")) {
         return false;
     }
     return true;

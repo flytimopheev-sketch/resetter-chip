@@ -26,7 +26,10 @@ std::optional<quint32> CounterReset::readCounter(const QByteArray &data, const C
     quint32 value = 0;
     for (quint32 i = 0; i < profile.counterSize; ++i) {
         const quint8 byte = static_cast<quint8>(data.at(static_cast<int>(profile.counterOffset + i)));
-        value |= static_cast<quint32>(byte) << (8u * i);
+        const quint32 shift = profile.counterBigEndian
+                                  ? 8u * (profile.counterSize - 1 - i)
+                                  : 8u * i;
+        value |= static_cast<quint32>(byte) << shift;
     }
     return value;
 }
@@ -39,7 +42,10 @@ bool CounterReset::setCounter(QByteArray &data, const ChipProfile &profile, quin
 
     const quint32 value = newValue & profile.counterMaxValue();
     for (quint32 i = 0; i < profile.counterSize; ++i) {
-        const quint8 byte = static_cast<quint8>((value >> (8u * i)) & 0xFFu);
+        const quint32 shift = profile.counterBigEndian
+                                  ? 8u * (profile.counterSize - 1 - i)
+                                  : 8u * i;
+        const quint8 byte = static_cast<quint8>((value >> shift) & 0xFFu);
         data[static_cast<int>(profile.counterOffset + i)] = static_cast<char>(byte);
     }
     return true;
@@ -47,7 +53,7 @@ bool CounterReset::setCounter(QByteArray &data, const ChipProfile &profile, quin
 
 std::optional<QByteArray> CounterReset::resetCounter(QByteArray data, const ChipProfile &profile)
 {
-    if (!setCounter(data, profile, 0)) {
+    if (!setCounter(data, profile, profile.counterInitialValue)) {
         return std::nullopt;
     }
     return data;

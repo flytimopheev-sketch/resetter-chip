@@ -20,6 +20,7 @@ enum class ErrorCode {
     FileReadError = 12,
     FileWriteError = 13,
     OperationCancelled = 14,
+    WriteFailed = 15,
     UnknownError = 99
 };
 
@@ -42,6 +43,7 @@ inline QString errorToString(ErrorCode code)
     case ErrorCode::FileReadError:           return QStringLiteral("Ошибка чтения файла");
     case ErrorCode::FileWriteError:          return QStringLiteral("Ошибка записи файла");
     case ErrorCode::OperationCancelled:      return QStringLiteral("Операция отменена пользователем");
+    case ErrorCode::WriteFailed:             return QStringLiteral("Ошибка записи в чип");
     case ErrorCode::UnknownError:            return QStringLiteral("Неизвестная ошибка");
     }
     return QStringLiteral("Неизвестная ошибка");

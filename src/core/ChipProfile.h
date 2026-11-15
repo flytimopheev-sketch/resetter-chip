@@ -28,6 +28,8 @@ struct ChipProfile {
 
     quint32 counterOffset = 0xFFFFFFFF;          // 0xFFFFFFFF = не задано
     quint32 counterSize = 2;                     // 1, 2 или 4 байта
+    quint32 counterInitialValue = 0;             // значение «нового» счётчика при сбросе
+    bool counterBigEndian = false;               // порядок байтов счётчика (false = little-endian)
 
     static ChipProfile fromJson(const QJsonObject &obj);
     QJsonObject toJson() const;

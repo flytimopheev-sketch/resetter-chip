@@ -72,6 +72,10 @@ ChipProfile ChipProfile::fromJson(const QJsonObject &obj)
     p.counterOffset = clampedUInt32(obj.value(QStringLiteral("counter_offset")),
                                     kCounterUnset, kCounterUnset);
     p.counterSize = clampedUInt32(obj.value(QStringLiteral("counter_size")), 2, 4);
+    p.counterInitialValue = clampedUInt32(obj.value(QStringLiteral("counter_initial_value")),
+                                          0, 0xFFFFFFFFu);
+    p.counterBigEndian = obj.value(QStringLiteral("counter_endian")).toString()
+                             .compare(QStringLiteral("big"), Qt::CaseInsensitive) == 0;
 
     p.protectedRanges = parseRanges(obj.value(QStringLiteral("protected_ranges")), p.sizeBytes);
     p.allowedRanges = parseRanges(obj.value(QStringLiteral("allowed_modify_ranges")), p.sizeBytes);
@@ -93,6 +97,9 @@ QJsonObject ChipProfile::toJson() const
     obj[QStringLiteral("family")] = family;
     obj[QStringLiteral("counter_offset")] = static_cast<qint64>(counterOffset);
     obj[QStringLiteral("counter_size")] = static_cast<qint64>(counterSize);
+    obj[QStringLiteral("counter_initial_value")] = static_cast<qint64>(counterInitialValue);
+    obj[QStringLiteral("counter_endian")] = counterBigEndian ? QStringLiteral("big")
+                                                             : QStringLiteral("little");
 
     QJsonArray ranges;
     for (const auto &range : protectedRanges) {

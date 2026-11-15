@@ -29,6 +29,7 @@ constexpr uint8_t kMagic2 = 0x5A;
 constexpr uint8_t kRequestHeader = 10;
 constexpr uint16_t kMaxPayload = 128;
 constexpr size_t kMaxFrame = kRequestHeader + kMaxPayload + 2;
+constexpr uint32_t kRxTimeoutMs = 50;
 
 enum Command : uint8_t {
     CmdRead = 1,
@@ -57,6 +58,7 @@ struct ChipConfig {
 ChipConfig config;
 uint8_t rxBuffer[kMaxFrame];
 size_t rxLength = 0;
+uint32_t lastRxMillis = 0;
 
 uint16_t checksum16(const uint8_t *data, size_t start, size_t end)
 {
@@ -100,7 +102,7 @@ uint8_t deviceAddress7(uint8_t baseAddress, uint32_t memoryAddress)
         const uint8_t mask = static_cast<uint8_t>((1u << config.blockBits) - 1u);
         const uint8_t shift = config.twoByteAddress ? 16 : 8;
         const uint8_t block = static_cast<uint8_t>((memoryAddress >> shift) & mask);
-        address = static_cast<uint8_t>(address | block);
+        address = static_cast<uint8_t>((address & ~mask) | block);
     }
     return address;
 }
@@ -208,8 +210,13 @@ void handleRequest(const uint8_t *frame, size_t frameLength)
         return;
     }
 
-    const uint16_t payloadLength = readLe16(frame + 8);
-    if (payloadLength > kMaxPayload || frameLength != kRequestHeader + payloadLength + 2) {
+    const uint8_t command = frame[2];
+    const uint16_t lengthField = readLe16(frame + 8);
+    // Для READ поле length — число читаемых байт, payload пуст;
+    // для остальных команд length — длина payload.
+    const uint16_t payloadLength = (command == CmdRead) ? 0 : lengthField;
+    if (lengthField > kMaxPayload || payloadLength > kMaxPayload
+        || frameLength != kRequestHeader + payloadLength + 2) {
         return;
     }
 
@@ -219,7 +226,6 @@ void handleRequest(const uint8_t *frame, size_t frameLength)
         return;
     }
 
-    const uint8_t command = frame[2];
     const uint8_t i2cAddress = frame[3];
     const uint32_t memoryAddress = readLe32(frame + 4);
     const uint16_t length = readLe16(frame + 8);
@@ -238,11 +244,21 @@ void handleRequest(const uint8_t *frame, size_t frameLength)
             sendResponse(StatusBadRequest, command, nullptr, 0);
             break;
         }
+        const uint8_t newBlockBits = payload[2];
+        const uint16_t newPageSize = readLe16(payload + 3);
+        const uint16_t newWriteCycleMs = readLe16(payload + 5);
+        const bool pageSizeOk = newPageSize >= 1 && newPageSize <= 4096
+                                && (newPageSize & (newPageSize - 1)) == 0;
+        // blockBits > 3 привёл бы к неопределённому сдвигу в deviceAddress7.
+        if (newBlockBits > 3 || !pageSizeOk || newWriteCycleMs > 60000) {
+            sendResponse(StatusBadRequest, command, nullptr, 0);
+            break;
+        }
         config.deviceAddress = payload[0];
         config.twoByteAddress = payload[1] != 0;
-        config.blockBits = payload[2];
-        config.pageSize = readLe16(payload + 3);
-        config.writeCycleMs = readLe16(payload + 5);
+        config.blockBits = newBlockBits;
+        config.pageSize = newPageSize;
+        config.writeCycleMs = newWriteCycleMs;
         sendResponse(StatusOk, command, nullptr, 0);
         break;
     }
@@ -298,14 +314,34 @@ void setup()
 
 void loop()
 {
+    // Недособранный кадр не должен «зависать» навсегда: сбрасываем буфер,
+    // если байты не приходят дольше kRxTimeoutMs.
+    if (rxLength > 0 && millis() - lastRxMillis > kRxTimeoutMs) {
+        rxLength = 0;
+    }
+
     while (Serial.available() > 0) {
         const uint8_t byte = static_cast<uint8_t>(Serial.read());
+        lastRxMillis = millis();
 
-        if (rxLength == 0 && byte != kMagic1) {
+        if (rxLength == 0) {
+            if (byte != kMagic1) {
+                continue;
+            }
+            rxBuffer[rxLength++] = byte;
             continue;
         }
-        if (rxLength == 1 && byte != kMagic2) {
-            rxLength = 0;
+        if (rxLength == 1) {
+            if (byte == kMagic2) {
+                rxBuffer[rxLength++] = byte;
+                continue;
+            }
+            // Ресинхронизация: в последовательности A5 A5 5A второй 0xA5
+            // может быть началом нового кадра — не теряем его.
+            rxLength = (byte == kMagic1) ? 1 : 0;
+            if (rxLength == 1) {
+                rxBuffer[0] = byte;
+            }
             continue;
         }
 
@@ -317,8 +353,10 @@ void loop()
         }
 
         if (rxLength >= kRequestHeader) {
-            const uint16_t payloadLength = readLe16(rxBuffer + 8);
-            if (payloadLength > kMaxPayload) {
+            const uint8_t cmd = rxBuffer[2];
+            const uint16_t lengthField = readLe16(rxBuffer + 8);
+            const uint16_t payloadLength = (cmd == CmdRead) ? 0 : lengthField;
+            if (lengthField > kMaxPayload || payloadLength > kMaxPayload) {
                 rxLength = 0;
                 continue;
             }

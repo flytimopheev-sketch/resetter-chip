@@ -29,6 +29,8 @@ struct CartridgeProfile {
     quint32 counterOffset = 0xFFFFFFFF;    // 0xFFFFFFFF = взять из профиля чипа
     quint32 counterSize = 0;               // 0 = взять из профиля чипа
     quint32 counterInitialValue = 0;       // значение нового/обнулённого счётчика
+    bool hasCounterInitialValue = false;   // задано ли поле в JSON (иначе берём из чипа)
+    QString counterEndian;                 // "little"/"big"; пусто = взять из профиля чипа
     quint32 pageResource = 0;               // заявленный ресурс, страниц
 
     QVector<CartridgeRange> protectedRanges;
